@@ -34,20 +34,14 @@ A Personal Knowledge Management (PKM) web application that empowers users to cap
 
 ```
 knowledge-app/
-├── frontend/          # React SPA
-│   ├── src/
-│   │   ├── features/  # notes, hierarchy, relationships, backlinks, search, tags, knowledge-graph
-│   │   ├── components/# layout (Header, Sidebar, MainLayout)
-│   │   ├── services/  # apiClient.js
-│   │   └── routes/    # AppRoutes.jsx
+├── frontend/          # React SPA (Vite + Tailwind + TipTap + React Flow)
+│   ├── README.md      # Frontend setup & run documentation
+│   ├── src/           # Features (notes, hierarchy, relationships, graph, search, tags)
 │   └── package.json
-├── backend/           # Express.js REST API + Prisma
+├── backend/           # Express.js REST API + Prisma ORM
+│   ├── README.md      # Backend setup, API endpoints & database guide
 │   ├── prisma/        # schema.prisma, seed.js
-│   ├── src/
-│   │   ├── modules/   # notes, relationships, tags, search, graph, export, users
-│   │   ├── config/    # database.js, env.js
-│   │   ├── middlewares/# errorHandler.js, validateRequest.js
-│   │   └── app.js, server.js
+│   ├── src/           # Modules (notes, relationships, tags, search, graph, export, users)
 │   └── package.json
 ├── docs/              # 25-document comprehensive architecture suite
 ├── .agent/            # Master Orchestrator, Gap Analysis, Checklist, Logs
@@ -57,7 +51,82 @@ knowledge-app/
 
 ---
 
-## Getting Started & Local Development
+## ⚡ Quick Start: How to Setup & Start Frontend and Backend
+
+Follow these 4 simple steps to get both backend and frontend running locally:
+
+### Step 1: Install Dependencies
+From the repository root:
+```bash
+npm run install:all
+```
+
+### Step 2: Configure Environment Variables
+Create the `.env` files for both backend and frontend:
+
+**Backend (`backend/.env`):**
+```bash
+# Copy from example
+cp backend/.env.example backend/.env
+```
+Ensure your PostgreSQL connection string is set in `backend/.env`:
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/knowledge_app?schema=public"
+DIRECT_URL="postgresql://postgres:postgres@localhost:5432/knowledge_app?schema=public"
+PORT=3000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173
+```
+
+**Frontend (`frontend/.env`):**
+```bash
+# Copy from example
+cp frontend/.env.example frontend/.env
+```
+Ensure the API URL points to the backend in `frontend/.env`:
+```env
+VITE_API_BASE_URL=http://localhost:3000/api/v1
+```
+
+### Step 3: Initialize Database (Prisma)
+Run migrations and seed the sample knowledge base:
+```bash
+# Generate Prisma client
+npm run prisma:generate
+
+# Run database migrations
+npm run prisma:migrate
+
+# Seed sample folders, notes, tags, and relationships
+npm run prisma:seed
+```
+
+### Step 4: Start Frontend and Backend Servers
+Open two terminal tabs:
+
+**Terminal 1 — Backend Server:**
+```bash
+npm run dev:backend
+```
+👉 Backend API will run on **`http://localhost:3000/api/v1`** (Health check: `http://localhost:3000/health`)
+
+**Terminal 2 — Frontend App:**
+```bash
+npm run dev:frontend
+```
+👉 Frontend Web UI will run on **`http://localhost:5173`**
+
+---
+
+## Dedicated Component Guides
+
+For detailed, independent guides, see:
+- 📘 [**Frontend README** (`frontend/README.md`)](./frontend/README.md) — Independent frontend setup, UI architecture, TipTap editor, and React Flow knowledge graph.
+- 📙 [**Backend README** (`backend/README.md`)](./backend/README.md) — Independent backend setup, PostgreSQL database options (Local / Neon), Prisma Studio, and complete REST API endpoint reference.
+
+---
+
+## Getting Started & Local Development Details
 
 ### 1. Prerequisites
 
