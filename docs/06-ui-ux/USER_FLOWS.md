@@ -8,14 +8,14 @@ sequenceDiagram
   actor User
   participant UI as NoteEditor UI
   participant Debounce as Auto-Save Debouncer
-  participant API as Express API
-  participant DB as MongoDB
+  participant API as Express API (/api/v1)
+  participant DB as PostgreSQL (Prisma)
 
   User->>UI: Types note title & content
   UI->>Debounce: Queue change (1500ms debounce)
-  Debounce->>API: PATCH /api/notes/:noteId
-  API->>DB: Update Note document
-  DB-->>API: Note saved
+  Debounce->>API: PATCH /api/v1/notes/:noteId
+  API->>DB: prisma.note.update(data)
+  DB-->>API: Note row updated
   API-->>UI: 200 OK (updated note)
   UI->>User: Displays "Saved" indicator
 ```
@@ -30,16 +30,16 @@ sequenceDiagram
   actor User
   participant UI as Tree Sidebar
   participant Service as Note Service
-  participant DB as MongoDB
+  participant DB as PostgreSQL (Prisma)
 
   User->>UI: Drags Note A into Folder B
-  UI->>Service: PATCH /api/notes/:noteAId/move { newParentId: folderBId }
+  UI->>Service: PATCH /api/v1/notes/:noteAId/move { newParentId: folderBId }
   Service->>DB: Check ancestors of Folder B
   alt Folder B is descendant of Note A
     Service-->>UI: 400 Bad Request (Circular reference prohibited)
     UI->>User: Reverts drag-and-drop & displays error
   else Valid parent move
-    Service->>DB: Update Note A parentId to Folder B
+    Service->>DB: Update Note A parent_id to Folder B
     DB-->>Service: Saved
     Service-->>UI: 200 OK
     UI->>User: Tree updates smoothly (relationships preserved)
@@ -55,13 +55,13 @@ sequenceDiagram
   autonumber
   actor User
   participant UI as Relationships Drawer
-  participant API as Express API
-  participant DB as MongoDB
+  participant API as Express API (/api/v1)
+  participant DB as PostgreSQL (Prisma)
 
   User->>UI: Selects "Add Connection" -> targets Note B -> selects "DEPENDS_ON"
-  UI->>API: POST /api/relationships { sourceNoteId: NoteA, targetNoteId: NoteB, relationshipType: 'DEPENDS_ON' }
-  API->>DB: Insert NoteRelationship document
-  DB-->>API: Created
+  UI->>API: POST /api/v1/relationships { sourceNoteId: NoteA, targetNoteId: NoteB, relationshipType: 'DEPENDS_ON' }
+  API->>DB: prisma.noteRelationship.create(...)
+  DB-->>API: Row created
   API-->>UI: 201 Created
   UI->>User: Connection appears in Outgoing panel; Note B backlink count increments
 ```

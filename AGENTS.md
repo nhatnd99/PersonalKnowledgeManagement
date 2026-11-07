@@ -23,18 +23,19 @@ Users can:
 
 Every architectural decision should serve the note — creation, organization, connection, search, and visualization.
 
-### Domain Model
-| Entity | Purpose |
-|--------|---------|
-| Note | Core knowledge item (content or folder) |
-| NoteRelationship | Directional typed connection between notes |
-| Tag | Reusable label for categorizing notes |
-| User | (Prepared for future auth, not active in MVP) |
+### Domain Model (PostgreSQL / Prisma)
+| Entity / Table | Purpose |
+|----------------|---------|
+| `notes` | Core knowledge items (content notes or folders) |
+| `note_relationships` | Directional typed connections between notes |
+| `tags` | Reusable labels for categorizing notes |
+| `note_tags` | Relational join table connecting notes and tags |
+| `users` | User accounts (prepared for future auth, not active in MVP) |
 
 ### Critical Architecture Rule
 **Hierarchy and relationships are independent.**
-- Moving a note within the hierarchy must NEVER remove or break its relationships.
-- `parentId` governs hierarchy. `NoteRelationship` governs connections.
+- Moving a note within the hierarchy must NEVER remove or break its knowledge graph relationships.
+- `parentId` governs hierarchy. `NoteRelationship` governs graph connections.
 
 ---
 
@@ -49,15 +50,15 @@ Every architectural decision should serve the note — creation, organization, c
 | shadcn/ui (Radix UI) | Accessible component primitives |
 | React Router v6 | Client-side routing |
 | Axios | HTTP client |
-| TipTap | Rich text editor |
+| TipTap | Rich text editor (ProseMirror JSON) |
 | React Flow (reactflow) | Knowledge graph visualization |
 
 ### Backend
 | Technology | Purpose |
 |-----------|---------|
-| Node.js >= 18 | Runtime |
+| Node.js >= 18 | Runtime (ES Modules) |
 | Express.js | HTTP framework |
-| Mongoose | MongoDB ODM |
+| Prisma ORM | Object-Relational Mapping & Client |
 | express-validator | Request validation |
 | express-async-errors | Async error propagation |
 | helmet | HTTP security headers |
@@ -67,8 +68,9 @@ Every architectural decision should serve the note — creation, organization, c
 ### Database
 | Technology | Purpose |
 |-----------|---------|
-| MongoDB | Primary database |
-| Mongoose | Schema definition and ODM |
+| PostgreSQL | Relational database (local development) |
+| Neon PostgreSQL | Managed serverless PostgreSQL (cloud / production) |
+| Prisma Migrate | Declarative database migrations |
 
 ---
 
@@ -79,20 +81,22 @@ These restrictions are ABSOLUTE. Do not introduce alternatives without explicit 
 ### FORBIDDEN
 - ❌ TypeScript — Use JavaScript (ES6+) only
 - ❌ Docker — Do not create Dockerfiles or docker-compose files
-- ❌ Microservices — This is a single backend application
+- ❌ Microservices — This is a single modular backend application
 - ❌ `.ts` or `.tsx` files — Use `.js` and `.jsx` only
 - ❌ `tsconfig.json` — Not applicable
 - ❌ Java, Python, or any non-JavaScript backend
 - ❌ Next.js or Remix — Pure React SPA + Express API
-- ❌ GraphQL — Use REST API only
+- ❌ GraphQL — Use REST API only with `/api/v1` prefix
 - ❌ Yarn or pnpm — Use npm only
+- ❌ MongoDB / Mongoose — Replaced by PostgreSQL + Prisma ORM
 
 ### REQUIRED
 - ✅ JavaScript ES6+ throughout
 - ✅ `.js` and `.jsx` file extensions
 - ✅ `type: "module"` in package.json (ES Modules)
 - ✅ npm for package management
-- ✅ Environment variables via `.env` files
+- ✅ Environment variables via `.env` files (`DATABASE_URL`, `DIRECT_URL`)
+- ✅ Prisma Client (`@prisma/client`) as single database access layer
 
 ---
 
@@ -102,7 +106,7 @@ These restrictions are ABSOLUTE. Do not introduce alternatives without explicit 
 ```
 knowledge-app/
 ├── frontend/     # React SPA (independent)
-├── backend/      # Express API (independent)
+├── backend/      # Express API + Prisma (independent)
 ├── docs/         # Documentation
 ├── AGENTS.md     # This file
 └── package.json  # Root monorepo config
@@ -126,7 +130,7 @@ frontend/src/
 │   ├── layout/            # App shell components
 │   └── ui/                # shadcn/ui wrappers
 ├── services/
-│   └── apiClient.js       # Centralized Axios instance (DO NOT DUPLICATE)
+│   └── apiClient.js       # Centralized Axios instance (baseURL: /api/v1)
 ├── hooks/                 # Shared hooks only
 ├── stores/                # Global state (introduce only when needed)
 ├── routes/AppRoutes.jsx   # Central route definitions
@@ -141,29 +145,33 @@ frontend/src/
 4. Routes are defined ONLY in `src/routes/AppRoutes.jsx`.
 5. `App.jsx` must remain minimal (providers + router only).
 
-### 4.3 Backend Architecture (Domain-Based)
+### 4.3 Backend Architecture (Modular Monolith with Prisma)
 
 ```
-backend/src/
-├── modules/               # Business domain modules
-│   └── <domain>/
-│       ├── <domain>.model.js       # Mongoose schema + model
-│       ├── <domain>.controller.js  # HTTP handler (req/res only)
-│       ├── <domain>.service.js     # Business logic
-│       ├── <domain>.routes.js      # Route definitions
-│       ├── <domain>.validation.js  # Validation rules
-│       └── <domain>.test.js        # Tests
-├── config/
-│   ├── database.js        # MongoDB connection
-│   └── env.js             # Environment config
-├── middlewares/
-│   ├── errorHandler.js    # AppError class + global error handler
-│   └── validateRequest.js # express-validator result middleware
-├── utils/
-│   └── apiResponse.js     # Standardized response helpers
-├── constants/index.js     # Shared backend constants
-├── app.js                 # Express app factory (middleware + routes)
-└── server.js              # HTTP server entry (startup + shutdown)
+backend/
+├── prisma/
+│   ├── schema.prisma       # Single source of truth for database schema
+│   ├── migrations/         # Prisma migration history
+│   └── seed.js             # Initial database seeding script
+├── src/
+│   ├── modules/            # Business domain modules
+│   │   └── <domain>/
+│   │       ├── <domain>.controller.js  # HTTP handler (req/res only)
+│   │       ├── <domain>.service.js     # Business logic + Prisma queries
+│   │       ├── <domain>.routes.js      # Route definitions (/api/v1/<domain>)
+│   │       ├── <domain>.validation.js  # Request validation rules
+│   │       └── <domain>.test.js        # Unit and integration tests
+│   ├── config/
+│   │   ├── database.js     # PrismaClient singleton instance
+│   │   └── env.js          # Environment config (DATABASE_URL, DIRECT_URL)
+│   ├── middlewares/
+│   │   ├── errorHandler.js # AppError + Prisma error handler
+│   │   └── validateRequest.js # express-validator result middleware
+│   ├── utils/
+│   │   └── apiResponse.js  # Standardized response helpers
+│   ├── constants/index.js  # Shared backend constants
+│   ├── app.js              # Express app factory (middleware + routes)
+│   └── server.js           # HTTP server entry (startup + shutdown)
 ```
 
 **Rules**:
@@ -171,7 +179,8 @@ backend/src/
 2. ALL business logic goes in services.
 3. Services throw `AppError` for operational errors.
 4. `app.js` is the app factory. `server.js` starts the HTTP server.
-5. New routes are registered in `app.js`.
+5. All database operations use `prisma` imported from `src/config/database.js`.
+6. New routes are registered in `app.js` under `/api/v1`.
 
 ---
 
@@ -188,7 +197,7 @@ backend/src/
 | Backend module file | domain.role.js | `note.service.js` |
 | Constant values | UPPER_SNAKE_CASE | `NOTE_TYPES.NOTE` |
 | Variables | camelCase | `noteTitle`, `isLoading` |
-| Mongoose model | PascalCase | `Note`, `NoteRelationship` |
+| Prisma models | PascalCase (mapped to snake_case tables) | `Note` (`notes`), `NoteRelationship` (`note_relationships`) |
 
 ### JavaScript Rules
 - Use `const` by default; `let` only when reassignment is needed; NEVER `var`
@@ -225,8 +234,8 @@ All exported functions must have JSDoc comments:
 ```javascript
 /**
  * Short description.
- * @param {string} noteId - MongoDB ObjectId string
- * @returns {Promise<Object>} The note document
+ * @param {string} noteId - UUID string
+ * @returns {Promise<Object>} The note record
  * @throws {AppError} 404 if note not found
  */
 export async function getNoteById(noteId) { ... }
@@ -234,48 +243,46 @@ export async function getNoteById(noteId) { ... }
 
 ---
 
-## 6. Database Rules
+## 6. Database Rules (PostgreSQL & Prisma)
 
 ### Schema Design
-1. Define field-level validation in Mongoose schemas
-2. Use `required`, `minlength`, `maxlength`, `enum` validators
-3. Use `timestamps: true` on all schemas
-4. Use `versionKey: false` to remove `__v`
-5. Store references as `Schema.Types.ObjectId` with `ref`
+1. All tables and columns defined in `backend/prisma/schema.prisma`
+2. Primary keys: UUID (`@id @default(uuid()) @db.Uuid`)
+3. Foreign keys: explicit relations with `@relation`
+4. Timestamps: `createdAt DateTime @default(now())`, `updatedAt DateTime @updatedAt`
+5. Map model names to plural snake_case table names (`@@map("notes")`)
+6. TipTap content: native PostgreSQL `Json? @db.JsonB`
 
 ### Hierarchy Rules
 - `parentId: null` = root note (no parent)
-- Use adjacency list pattern (parentId field)
+- Adjacency list self-referencing relation on `notes`
 - Circular references MUST be prevented in the service layer before saving
 - Circular reference check: traverse ancestors upward; if the target `newParentId` is a descendant of the note being moved, reject it
+
+### Note Deletion Rules
+- Default deletion: re-parents direct children to the deleted note's `parentId`
+- Cascade deletion (`cascade=true`): recursively deletes descendants
+- **Knowledge graph cleanup**: Deleting a note MUST delete all `NoteRelationship` records where the note is source OR target (`onDelete: Cascade` in Prisma schema)
 
 ### Relationship Rules
 - Relationships are DIRECTIONAL: `sourceNoteId → targetNoteId`
 - A note cannot relate to itself (`sourceNoteId !== targetNoteId`)
-- Duplicate relationships are prevented by the unique compound index
-- When a note is deleted, ALL its relationships (as source OR target) must be deleted
+- Duplicate relationships are prevented by composite unique constraint: `@@unique([sourceNoteId, targetNoteId, relationshipType])`
 
 ### Indexing Rules
-- Always create indexes for fields used in `find()` filters
-- Document the reason for each index in a comment above it
-- Do NOT create redundant indexes
-- Never remove an existing index without understanding the impact
-
-### Do Not
-- Do NOT store deeply nested hierarchy as embedded arrays in documents
-- Do NOT populate references unnecessarily
-- Do NOT change schema field types without documenting the migration
-- Do NOT remove indexes without reviewing all query patterns
+- Index `parentId`, `type`, `title`, `archivedAt`, `isFavorite`, and relationship lookups
+- Review query execution before adding redundant indexes
 
 ---
 
 ## 7. API Rules
 
 ### URL Conventions
-- Lowercase, hyphenated paths: `/api/note-relationships`
-- Plural nouns for collections: `/api/notes`, `/api/tags`
-- ObjectId in path: `/api/notes/:noteId`
-- Sub-resources: `/api/notes/:noteId/children`
+- API version prefix: `/api/v1`
+- Lowercase, hyphenated paths: `/api/v1/note-relationships`
+- Plural nouns for collections: `/api/v1/notes`, `/api/v1/tags`
+- UUID in path: `/api/v1/notes/:noteId`
+- Sub-resources: `/api/v1/notes/:noteId/children`
 
 ### HTTP Methods
 | Method | Use |
@@ -307,7 +314,7 @@ Error responses:
 
 ### Validation Rules
 - Use `express-validator` for all input validation
-- Validate ObjectId format with `.isMongoId()`
+- Validate UUID format with `.isUUID()`
 - Validate enums with `.isIn([...validValues])`
 - Use `validateRequest` middleware after validation rules
 - Return field-level errors to the client
@@ -318,7 +325,7 @@ Error responses:
 - 204: No Content (delete)
 - 400: Bad Request / Validation
 - 404: Not Found
-- 409: Conflict (duplicate)
+- 409: Conflict (duplicate unique constraint)
 - 500: Internal Server Error
 
 ---
@@ -340,9 +347,9 @@ A feature is NOT complete without tests.
 
 **Note Service**:
 - Create note (valid, missing title, invalid parentId)
-- Get note (found, not found, invalid ID)
+- Get note (found, not found, invalid UUID)
 - Update note
-- Delete note (cleanup relationships)
+- Delete note (reparenting vs cascade, relationship cleanup)
 - Move note (success, circular reference prevention)
 
 **Relationship Service**:
@@ -352,8 +359,8 @@ A feature is NOT complete without tests.
 - Cleanup on note deletion
 
 ### Test Framework
-- Backend: Jest with ES modules
-- Run: `npm test` from `backend/` directory
+- Backend: Jest with native ES modules
+- Run: `npm test` from monorepo root or `backend/` directory
 
 ---
 
@@ -363,64 +370,38 @@ A feature is NOT complete without tests.
 | Event | Update Required |
 |-------|----------------|
 | New API endpoint added | `docs/05-api/API_SPECIFICATION.md` |
-| Schema changed | `docs/04-database/DATABASE_SCHEMA.md` |
+| Schema changed | `docs/04-database/DATABASE_SCHEMA.md` & `backend/prisma/schema.prisma` |
 | New index added | `docs/04-database/INDEX_STRATEGY.md` |
 | Architecture changed | `docs/03-architecture/` |
 | New feature complete | `docs/02-requirements/FUNCTIONAL_REQUIREMENTS.md` (update status) |
 | Significant decision made | `docs/03-architecture/ARCHITECTURAL_DECISIONS.md` |
 
-### Documentation Standards
-- Write in English
-- Use Markdown
-- Distinguish clearly: ✅ Implemented | 📋 Planned | 🔮 Future
-- Include Mermaid diagrams for flows and architectures
-- Never document planned features as implemented
-- Update `CHANGELOG.md` for every significant change
-
 ---
 
 ## 10. AI Agent Rules
 
-### Before Starting Any Task
-1. ✅ Read `AGENTS.md` (this file)
-2. ✅ Read the relevant documentation in `docs/` for the feature you are working on
-3. ✅ Read the existing files in the module you are modifying
-4. ✅ Understand what already exists before adding anything
-
-### During Implementation
-5. ✅ Follow the architecture — do not create files outside the defined structure
-6. ✅ Follow naming conventions exactly
-7. ✅ Write JSDoc for all exported functions
-8. ✅ Handle all errors explicitly
-9. ✅ Do NOT install new dependencies without informing the user and explaining why
-10. ✅ Do NOT modify schemas without documenting the change
-
-### Module Isolation
-11. ✅ Only modify files related to the feature you are implementing
-12. ✅ Do NOT modify unrelated modules
-13. ✅ Do NOT refactor code that is not part of your task unless requested
-
-### Verification
-14. ✅ Verify your implementation is consistent with the architecture before claiming completion
-15. ✅ Check that all referenced files and imports exist
-16. ✅ Ensure new routes are registered in `app.js`
-17. ✅ Ensure new schemas are consistent with `DATABASE_SCHEMA.md`
-
-### Reporting
-18. ✅ Report all files you created or modified
-19. ✅ Report any unresolved issues or design decisions that need user input
-20. ✅ Update CHANGELOG.md after significant changes
-21. ✅ Update documentation after implementing a feature
+1. ✅ Read `AGENTS.md` (this file) before starting any task
+2. ✅ Read relevant documentation in `docs/` for the feature being worked on
+3. ✅ Follow the architecture — do not create files outside the defined structure
+4. ✅ Follow naming conventions exactly
+5. ✅ Write JSDoc for all exported functions
+6. ✅ Handle all errors explicitly via `AppError`
+7. ✅ Do NOT install new dependencies without informing the user and explaining why
+8. ✅ Do NOT modify schemas without running `npx prisma validate` and documenting the migration
+9. ✅ Only modify files related to the feature you are implementing
+10. ✅ Verify implementation before claiming completion
+11. ✅ Ensure new routes are registered in `app.js` under `/api/v1`
+12. ✅ Update CHANGELOG.md after significant changes
 
 ### Prohibited Actions
 - ❌ Do NOT introduce TypeScript
 - ❌ Do NOT create Docker files
 - ❌ Do NOT use yarn or pnpm
 - ❌ Do NOT create microservices
-- ❌ Do NOT change the approved architecture without justification
+- ❌ Do NOT reintroduce MongoDB or Mongoose
 - ❌ Do NOT silently swallow errors
 - ❌ Do NOT claim a feature is complete without tests
-- ❌ Do NOT expose sensitive data in API responses
+- ❌ Do NOT expose sensitive database credentials in code or logs
 
 ---
 
@@ -428,19 +409,15 @@ A feature is NOT complete without tests.
 
 | Need | File |
 |------|------|
-| API client config | `frontend/src/services/apiClient.js` |
-| App constants (frontend) | `frontend/src/constants/index.js` |
-| App constants (backend) | `backend/src/constants/index.js` |
+| Prisma Schema | `backend/prisma/schema.prisma` |
+| Database connection (Prisma) | `backend/src/config/database.js` |
 | Environment config | `backend/src/config/env.js` |
-| Database connection | `backend/src/config/database.js` |
 | Express app setup | `backend/src/app.js` |
 | Server startup | `backend/src/server.js` |
 | Error handling | `backend/src/middlewares/errorHandler.js` |
 | Response helpers | `backend/src/utils/apiResponse.js` |
-| Note model | `backend/src/modules/notes/note.model.js` |
-| Relationship model | `backend/src/modules/relationships/noteRelationship.model.js` |
-| Tag model | `backend/src/modules/tags/tag.model.js` |
-| User model | `backend/src/modules/users/user.model.js` |
+| API client config (frontend) | `frontend/src/services/apiClient.js` |
+| App constants (frontend) | `frontend/src/constants/index.js` |
 | Route definitions | `frontend/src/routes/AppRoutes.jsx` |
 
 ---
@@ -449,14 +426,17 @@ A feature is NOT complete without tests.
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 0 | Foundation | ✅ Complete |
-| 1 | Core Note System | 📋 Ready to implement |
-| 2 | Hierarchical Organization | 📋 Planned |
-| 3 | Knowledge Connections | 📋 Planned |
-| 4 | Knowledge Discovery | 📋 Planned |
-| 5 | Knowledge Graph | 📋 Planned |
-| 6+ | Auth, Export, Import | 🔮 Future |
+| 0 | Foundation & Prisma Architecture | ✅ Complete & Verified |
+| 1 | Core Note Backend (PostgreSQL + Prisma) | ✅ Complete & Verified |
+| 2 | Core Frontend & Note Editor (TipTap) | ✅ Complete & Verified |
+| 3 | Hierarchical Note Organization | ✅ Complete & Verified |
+| 4 | Note Relationships & Backlinks | ✅ Complete & Verified |
+| 5 | Tags, Favorites, and Search | ✅ Complete & Verified |
+| 6 | Knowledge Graph Visualization (React Flow) | ✅ Complete & Verified |
+| 7 | Authentication & User Isolation Architecture | ✅ Complete & Verified |
+| 8 | Import & Export (Markdown/JSON) | ✅ Complete & Verified |
+| 9 | Final Integration, Regression, and Release Preparation | ✅ Complete & Verified |
 
 ---
 
-*Last updated: 2026-11-07 — Phase 0 Foundation*
+*Last updated: 2026-11-07 — Architecture Update: PostgreSQL + Prisma Migration*

@@ -2,7 +2,7 @@ import { env } from '../config/env.js';
 
 /**
  * Custom application error class.
- * Use this to throw structured API errors from service or controller layers.
+ * Use this to throw structured operational API errors from service layers.
  *
  * @example
  * throw new AppError('Note not found', 404);
@@ -37,11 +37,12 @@ export function notFoundHandler(req, res, _next) {
  * Must be the last middleware registered in app.js.
  *
  * Handles:
- * - AppError (operational errors): return structured JSON response
- * - Mongoose validation errors: format field-level validation messages
- * - Mongoose duplicate key errors (11000): return 409 Conflict
- * - Mongoose CastError (invalid ObjectId): return 400 Bad Request
- * - Unknown errors: return 500 Internal Server Error
+ * - AppError: operational business logic errors
+ * - Prisma P2002: Unique constraint violation (409 Conflict)
+ * - Prisma P2025: Record not found (404 Not Found)
+ * - Prisma P2003: Foreign key constraint failure (400 Bad Request)
+ * - PrismaClientValidationError: invalid query payload (400 Bad Request)
+ * - Unknown runtime errors (500 Internal Server Error)
  */
 export function globalErrorHandler(err, _req, res, _next) {
   // AppError — operational, known error
@@ -53,35 +54,39 @@ export function globalErrorHandler(err, _req, res, _next) {
     });
   }
 
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    const errors = Object.values(err.errors).map((e) => ({
-      field: e.path,
-      message: e.message,
-    }));
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors,
-    });
-  }
-
-  // Mongoose duplicate key error
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue || {})[0] || 'field';
+  // Prisma Client Known Request Errors
+  if (err.code === 'P2002') {
+    const target = Array.isArray(err.meta?.target) ? err.meta.target.join(', ') : err.meta?.target || 'field';
     return res.status(409).json({
       success: false,
-      message: `Duplicate value for field: ${field}`,
-      errors: [{ field, message: 'Value already exists' }],
+      message: `A record with this ${target} already exists`,
+      errors: [{ field: target, message: 'Unique constraint violation' }],
     });
   }
 
-  // Mongoose CastError — invalid ObjectId
-  if (err.name === 'CastError') {
+  if (err.code === 'P2025') {
+    return res.status(404).json({
+      success: false,
+      message: err.meta?.cause || 'Record not found',
+      errors: [],
+    });
+  }
+
+  if (err.code === 'P2003') {
+    const field = err.meta?.field_name || 'relation';
     return res.status(400).json({
       success: false,
-      message: `Invalid value for field: ${err.path}`,
-      errors: [{ field: err.path, message: 'Invalid format' }],
+      message: `Invalid reference on foreign key: ${field}`,
+      errors: [{ field, message: 'Foreign key constraint failed' }],
+    });
+  }
+
+  // Prisma Client Validation Error
+  if (err.name === 'PrismaClientValidationError') {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid data provided to database operation',
+      errors: [],
     });
   }
 

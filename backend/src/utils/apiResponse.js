@@ -18,13 +18,18 @@
  * @param {*} data - Response data payload
  * @param {string} [message] - Optional success message
  * @param {number} [statusCode=200] - HTTP status code
+ * @param {Object} [meta=null] - Optional metadata
  */
-export function sendSuccess(res, data, message = 'Success', statusCode = 200) {
-  return res.status(statusCode).json({
+export function sendSuccess(res, data, message = 'Success', statusCode = 200, meta = null) {
+  const payload = {
     success: true,
     message,
     data,
-  });
+  };
+  if (meta) {
+    payload.meta = meta;
+  }
+  return res.status(statusCode).json(payload);
 }
 
 /**
@@ -32,26 +37,29 @@ export function sendSuccess(res, data, message = 'Success', statusCode = 200) {
  * @param {import('express').Response} res - Express response object
  * @param {Array} data - Array of items
  * @param {Object} meta - Pagination metadata
- * @param {number} meta.total - Total number of items
- * @param {number} meta.page - Current page number
- * @param {number} meta.limit - Items per page
  * @param {string} [message] - Optional success message
  */
 export function sendPaginatedSuccess(res, data, meta, message = 'Success') {
-  const { total, page, limit } = meta;
-  return res.status(200).json({
-    success: true,
-    message,
-    data,
-    meta: {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      hasNextPage: page * limit < total,
-      hasPrevPage: page > 1,
-    },
-  });
+  return sendSuccess(res, data, message, 200, buildPaginationMeta(meta.total, meta.page, meta.limit));
+}
+
+/**
+ * Helper to build standard pagination meta object.
+ * @param {number} total
+ * @param {number} page
+ * @param {number} limit
+ * @returns {Object}
+ */
+export function buildPaginationMeta(total, page, limit) {
+  const totalPages = Math.ceil(total / limit) || 1;
+  return {
+    total,
+    page,
+    limit,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
 }
 
 /**

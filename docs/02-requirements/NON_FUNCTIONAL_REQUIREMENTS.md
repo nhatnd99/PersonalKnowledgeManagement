@@ -1,4 +1,4 @@
-﻿# Non-Functional Requirements
+# Non-Functional Requirements
 
 ## NFR-01: Performance
 
@@ -15,7 +15,7 @@
 | ID | Requirement |
 |----|-------------|
 | NFR-02.1 | Data model must support future multi-user mode without schema redesign |
-| NFR-02.2 | Hierarchy traversal must not require recursive MongoDB queries by default |
+| NFR-02.2 | Hierarchy traversal must not require recursive database queries by default |
 | NFR-02.3 | Indexes must be defined for all common query patterns |
 
 ## NFR-03: Maintainability

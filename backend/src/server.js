@@ -1,5 +1,5 @@
 import { validateEnv, env } from './config/env.js';
-import { connectDatabase, disconnectDatabase, registerDatabaseEvents } from './config/database.js';
+import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { createApp } from './app.js';
 
 /**
@@ -7,11 +7,9 @@ import { createApp } from './app.js';
  *
  * Responsibilities:
  * 1. Validate environment configuration
- * 2. Connect to MongoDB
+ * 2. Connect to PostgreSQL via Prisma
  * 3. Start the HTTP server
  * 4. Handle graceful shutdown
- *
- * Keep this file minimal. Application setup belongs in app.js.
  */
 
 async function startServer() {
@@ -20,8 +18,15 @@ async function startServer() {
     validateEnv();
 
     // 2. Connect to database
-    registerDatabaseEvents();
-    await connectDatabase();
+    try {
+      await connectDatabase();
+    } catch (dbError) {
+      if (env.isDevelopment) {
+        console.warn('[Database] Warning: PostgreSQL not reachable at startup. Ensure PostgreSQL service is started or configure DATABASE_URL in .env before performing database queries.');
+      } else {
+        throw dbError;
+      }
+    }
 
     // 3. Create and start Express app
     const app = createApp();
@@ -29,6 +34,7 @@ async function startServer() {
       console.info(`[Server] Knowledge App API running on port ${env.port}`);
       console.info(`[Server] Environment: ${env.nodeEnv}`);
       console.info(`[Server] Health check: http://localhost:${env.port}/health`);
+      console.info(`[Server] API v1 Base: http://localhost:${env.port}/api/v1`);
     });
 
     // 4. Graceful shutdown handlers
@@ -56,7 +62,6 @@ async function startServer() {
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-    // Handle unhandled rejections
     process.on('unhandledRejection', (reason) => {
       console.error('[Server] Unhandled Promise Rejection:', reason);
     });

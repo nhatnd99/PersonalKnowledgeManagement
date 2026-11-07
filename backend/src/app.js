@@ -7,6 +7,12 @@ import 'express-async-errors';
 
 import { env } from './config/env.js';
 import { notFoundHandler, globalErrorHandler } from './middlewares/errorHandler.js';
+import noteRoutes from './modules/notes/note.routes.js';
+import relationshipRoutes from './modules/relationships/relationship.routes.js';
+import tagRoutes from './modules/tags/tag.routes.js';
+import searchRoutes from './modules/search/search.routes.js';
+import graphRoutes from './modules/graph/graph.routes.js';
+import userRoutes from './modules/users/user.routes.js';
 
 /**
  * Application factory.
@@ -65,29 +71,30 @@ export function createApp() {
     });
   });
 
-  // ─── API Routes ───────────────────────────────────────────────────────────
-  // Routes are registered here as modules are implemented
-  // Example: app.use('/api/notes', noteRoutes);
-  // app.use('/api/notes', noteRoutes);
-  // app.use('/api/relationships', relationshipRoutes);
-  // app.use('/api/tags', tagRoutes);
-  // app.use('/api/search', searchRoutes);
-
-  // ─── API Root ─────────────────────────────────────────────────────────────
-  app.get('/api', (_req, res) => {
+  // ─── API v1 Root ──────────────────────────────────────────────────────────
+  app.get(['/api', '/api/v1'], (_req, res) => {
     res.json({
       success: true,
-      message: 'Knowledge App API',
+      message: 'Knowledge App API v1',
       version: '0.1.0',
+      database: 'PostgreSQL (Prisma ORM)',
       endpoints: {
         health: '/health',
-        notes: '/api/notes (not yet implemented)',
-        relationships: '/api/relationships (not yet implemented)',
-        tags: '/api/tags (not yet implemented)',
-        search: '/api/search (not yet implemented)',
+        notes: '/api/v1/notes (planned Phase 1)',
+        relationships: '/api/v1/relationships (planned Phase 3)',
+        tags: '/api/v1/tags (planned Phase 4)',
+        search: '/api/v1/search (planned Phase 4)',
       },
     });
   });
+
+  // ─── API v1 Routes ────────────────────────────────────────────────────────
+  app.use('/api/v1/notes', noteRoutes);
+  app.use('/api/v1/relationships', relationshipRoutes);
+  app.use('/api/v1/tags', tagRoutes);
+  app.use('/api/v1/search', searchRoutes);
+  app.use('/api/v1/graph', graphRoutes);
+  app.use('/api/v1/user', userRoutes);
 
   // ─── Error Handling ───────────────────────────────────────────────────────
   app.use(notFoundHandler);

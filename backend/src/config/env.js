@@ -18,9 +18,9 @@ export const env = {
   isProduction: process.env.NODE_ENV === 'production',
   isTest: process.env.NODE_ENV === 'test',
 
-  // Database
-  mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/knowledge-app',
-  mongodbDbName: process.env.MONGODB_DB_NAME || 'knowledge-app',
+  // Database (PostgreSQL / Neon via Prisma)
+  databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/knowledge_app?schema=public',
+  directUrl: process.env.DIRECT_URL || process.env.DATABASE_URL,
 
   // CORS
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -40,16 +40,16 @@ export const env = {
 export function validateEnv() {
   const warnings = [];
 
-  if (!process.env.MONGODB_URI) {
-    warnings.push('MONGODB_URI not set, using default local connection');
+  if (!process.env.DATABASE_URL) {
+    warnings.push('DATABASE_URL not set, using default local PostgreSQL connection');
   }
 
   if (!process.env.CORS_ORIGIN) {
     warnings.push('CORS_ORIGIN not set, using default http://localhost:5173');
   }
 
-  if (env.isProduction && !process.env.MONGODB_URI) {
-    throw new Error('MONGODB_URI is required in production');
+  if (env.isProduction && !process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is required in production');
   }
 
   warnings.forEach((w) => console.warn(`[Config] Warning: ${w}`));

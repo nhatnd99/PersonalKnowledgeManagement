@@ -1,6 +1,6 @@
 module.exports = {
   root: true,
-  env: { node: true, es2022: true },
+  env: { node: true, es2022: true, jest: true },
   extends: ['eslint:recommended'],
   ignorePatterns: ['node_modules/', 'tests/', '.eslintrc.cjs'],
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },

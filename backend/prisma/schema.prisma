@@ -1,0 +1,129 @@
+// Prisma schema for Knowledge App
+// Database: PostgreSQL (Local PostgreSQL & Neon PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum NoteType {
+  NOTE
+  FOLDER
+}
+
+enum RelationshipType {
+  RELATED_TO
+  DEPENDS_ON
+  REFERENCES
+  EXTENDS
+  CONTRADICTS
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+/// Users table — prepared for future multi-user authentication.
+/// Optional and unreferenced by Notes during MVP.
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String?  @unique @db.VarChar(255)
+  name      String?  @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+/// Notes table — core entity representing both content notes and organizational folders.
+/// Hierarchy is governed by self-referencing parentId.
+/// Content is stored natively as ProseMirror JSON using PostgreSQL JSONB.
+model Note {
+  id            String    @id @default(uuid()) @db.Uuid
+  title         String    @db.VarChar(500)
+  type          NoteType  @default(NOTE)
+  content       Json?     @db.JsonB
+  contentFormat String    @default("json") @map("content_format") @db.VarChar(50)
+  parentId      String?   @map("parent_id") @db.Uuid
+  sortOrder     Int       @default(0) @map("sort_order")
+  isFavorite    Boolean   @default(false) @map("is_favorite")
+  archivedAt    DateTime? @map("archived_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Hierarchy self-relation
+  // onDelete: SetNull ensures deleting a parent does not blindly cascade in the DB layer;
+  // business logic (re-parenting or selective cascade) is governed in service layer.
+  parent   Note?  @relation("NoteHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Note[] @relation("NoteHierarchy")
+
+  // Independent Knowledge Graph connections
+  // Cascades ensure dangling graph relationships are removed when a note is deleted.
+  outgoingRelationships NoteRelationship[] @relation("OutgoingRelations")
+  incomingRelationships NoteRelationship[] @relation("IncomingRelations")
+
+  // Many-to-many relationship with tags
+  tags NoteTag[]
+
+  @@index([parentId])
+  @@index([type])
+  @@index([title])
+  @@index([archivedAt])
+  @@index([isFavorite])
+  @@index([updatedAt])
+  @@map("notes")
+}
+
+/// NoteRelationships table — independent, directional connections between notes.
+/// Independent from parent-child hierarchy.
+model NoteRelationship {
+  id               String           @id @default(uuid()) @db.Uuid
+  sourceNoteId     String           @map("source_note_id") @db.Uuid
+  targetNoteId     String           @map("target_note_id") @db.Uuid
+  relationshipType RelationshipType @map("relationship_type")
+  description      String?          @db.VarChar(1000)
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  sourceNote Note @relation("OutgoingRelations", fields: [sourceNoteId], references: [id], onDelete: Cascade)
+  targetNote Note @relation("IncomingRelations", fields: [targetNoteId], references: [id], onDelete: Cascade)
+
+  // Composite unique constraint: prevent duplicate relationship of same type between two notes
+  @@unique([sourceNoteId, targetNoteId, relationshipType])
+  @@index([sourceNoteId])
+  @@index([targetNoteId])
+  @@index([relationshipType])
+  @@map("note_relationships")
+}
+
+/// Tags table — centralized taxonomy labels for categorizing notes.
+model Tag {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  color       String?  @db.VarChar(20)
+  description String?  @db.VarChar(500)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  notes NoteTag[]
+
+  @@map("tags")
+}
+
+/// NoteTags join table — explicit relational join table between Note and Tag.
+model NoteTag {
+  noteId    String   @map("note_id") @db.Uuid
+  tagId     String   @map("tag_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([tagId])
+  @@map("note_tags")
+}

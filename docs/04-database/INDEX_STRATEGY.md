@@ -1,79 +1,42 @@
-﻿# Index Strategy
+# Database Index Strategy (PostgreSQL + Prisma)
 
 ## Principles
-1. Create indexes for fields that appear in `find()` query filters
-2. Create compound indexes for common multi-field queries
-3. Use text indexes for full-text search
-4. Avoid over-indexing (each index costs write performance)
-5. Document the reason for each index
+1. Create indexes for foreign keys and filter columns (`WHERE`, `ORDER BY`, `JOIN`).
+2. Use composite unique constraints to guarantee data integrity at the database engine level.
+3. Keep write overhead balanced (avoid over-indexing rarely queried columns).
+4. All indexes are managed through Prisma Migrate.
 
 ---
 
-## Note Collection Indexes
+## 1. `notes` Table Indexes
 
-### `parentId` (Single Field)
-```javascript
-noteSchema.index({ parentId: 1 });
-```
-**Reason**: Most frequent query — "get all children of this parent". Called whenever a tree node is expanded.
-
-### `title + content` (Text Index)
-```javascript
-noteSchema.index({ title: 'text', content: 'text' }, { weights: { title: 10, content: 1 } });
-```
-**Reason**: Powers full-text search. Title weighted 10x higher than content.
-
-### `isArchived + updatedAt` (Compound)
-```javascript
-noteSchema.index({ isArchived: 1, updatedAt: -1 });
-```
-**Reason**: Most list views filter `isArchived: false` and sort by `updatedAt` descending (recently updated first).
-
-### `isFavorite + updatedAt` (Compound)
-```javascript
-noteSchema.index({ isFavorite: 1, updatedAt: -1 });
-```
-**Reason**: Favorites view filters by `isFavorite: true` sorted by recently updated.
+| Index Target | Type | Reason | Query Pattern |
+|--------------|------|--------|---------------|
+| `id` | B-tree (Primary Key) | Uniquely identifies note | `WHERE id = :id` |
+| `parent_id` | B-tree | Tree navigation; fetch siblings and direct children | `WHERE parent_id = :parentId ORDER BY sort_order` |
+| `type` | B-tree | Filter folders vs notes | `WHERE type = 'FOLDER'` |
+| `title` | B-tree | Quick prefix lookups and alphabetical sorting | `WHERE title ILIKE :term` |
+| `archived_at` | B-tree | Filter active vs archived notes | `WHERE archived_at IS NULL` |
+| `is_favorite` | B-tree | Quick retrieval of starred notes | `WHERE is_favorite = true` |
+| `updated_at` | B-tree | Recently updated notes view | `ORDER BY updated_at DESC LIMIT :limit` |
 
 ---
 
-## NoteRelationship Collection Indexes
+## 2. `note_relationships` Table Indexes
 
-### `sourceNoteId` (Single Field)
-```javascript
-noteRelationshipSchema.index({ sourceNoteId: 1 });
-```
-**Reason**: "Get all outgoing relationships from note X" — called when viewing a note's connections panel.
-
-### `targetNoteId` (Single Field)
-```javascript
-noteRelationshipSchema.index({ targetNoteId: 1 });
-```
-**Reason**: "Get all incoming relationships to note X" — called for backlinks. This is effectively the backlink index.
-
-### `sourceNoteId + targetNoteId + relationshipType` (Unique Compound)
-```javascript
-noteRelationshipSchema.index(
-  { sourceNoteId: 1, targetNoteId: 1, relationshipType: 1 },
-  { unique: true }
-);
-```
-**Reason**: Enforces uniqueness constraint (no duplicate relationships). Also covers queries for specific relationship existence checks.
+| Index Target | Type | Reason | Query Pattern |
+|--------------|------|--------|---------------|
+| `(source_note_id, target_note_id, relationship_type)` | Composite Unique | Enforce relationship uniqueness | Prevents duplicate edges |
+| `source_note_id` | B-tree (Foreign Key) | Outgoing relationships panel & graph edges | `WHERE source_note_id = :noteId` |
+| `target_note_id` | B-tree (Foreign Key) | Backlinks panel & graph incoming edges | `WHERE target_note_id = :noteId` |
+| `relationship_type` | B-tree | Graph filtering by connection type | `WHERE relationship_type = :type` |
 
 ---
 
-## Tag Collection Indexes
+## 3. `tags` & `note_tags` Table Indexes
 
-### `name` (Unique)
-Defined via `unique: true` on the schema field.
-**Reason**: Tag names must be unique. Also enables fast tag lookup by name.
-
----
-
-## Future Indexes to Consider
-
-| Index | Trigger |
-|-------|---------|
-| `Note.tags` | When tag filtering becomes slow |
-| `Note.type` | When filtering NOTE vs FOLDER becomes frequent |
-| `Note.sortOrder + parentId` | When sibling ordering queries slow down |
+| Index Target | Type | Reason | Query Pattern |
+|--------------|------|--------|---------------|
+| `tags.name` | Unique B-tree | Tag name deduplication & fast lookup | `WHERE name = :name` |
+| `note_tags.(note_id, tag_id)` | Composite Primary Key | Enforce unique note-tag pair | Junction table identity |
+| `note_tags.tag_id` | B-tree (Foreign Key) | Find all notes tagged with tag X | `WHERE tag_id = :tagId` |

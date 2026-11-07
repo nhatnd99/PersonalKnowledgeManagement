@@ -1,6 +1,6 @@
-# API Error Handling
+# API Error Handling (PostgreSQL / Prisma)
 
-## Error Response Format
+## 1. Error Response Format
 
 All API errors return a standardized JSON structure:
 
@@ -17,68 +17,54 @@ All API errors return a standardized JSON structure:
 }
 ```
 
-## Error Categories
+---
 
-### Validation Errors (400)
-Returned when request parameters or payload fail express-validator checks.
+## 2. Error Categories & Mapping
 
+### 1. Validation Errors (`400 Bad Request`)
+Triggered when request payload fails `express-validator` rules.
 ```json
 {
   "success": false,
   "message": "Validation failed",
   "errors": [
     { "field": "title", "message": "Title cannot be empty" },
-    { "field": "type", "message": "Invalid note type" }
+    { "field": "parentId", "message": "Parent ID must be a valid UUID" }
   ]
 }
 ```
 
-### Not Found (404)
-Returned when a requested resource does not exist.
+### 2. Operational Business Errors (`AppError`)
+Thrown explicitly by service layers.
+- Not Found (`404`): `throw new AppError('Note not found', 404)`
+- Circular Reference (`400`): `throw new AppError('Cannot move note into its own descendant', 400)`
+- Self-Relationship (`400`): `throw new AppError('A note cannot relate to itself', 400)`
 
-```json
-{
-  "success": false,
-  "message": "Note not found",
-  "errors": []
-}
-```
+### 3. Prisma Client Known Request Errors
+Handled in `backend/src/middlewares/errorHandler.js`:
 
-### Conflict (409)
-Returned when attempting to create duplicate entities (e.g., existing tag name, existing relationship).
+| Prisma Error Code | Meaning | HTTP Status | Response Handling |
+|-------------------|---------|-------------|-------------------|
+| `P2002` | Unique constraint violation | `409 Conflict` | Identifies duplicate field(s) |
+| `P2025` | Record to update/delete not found | `404 Not Found` | Returns "Record not found" |
+| `P2003` | Foreign key constraint failed | `400 Bad Request` | Identifies invalid foreign key |
+| `PrismaClientValidationError` | Invalid query argument type | `400 Bad Request` | Returns "Invalid data provided" |
 
-```json
-{
-  "success": false,
-  "message": "Duplicate relationship already exists",
-  "errors": []
-}
-```
+### 4. Unhandled Runtime Exceptions (`500 Internal Server Error`)
+Unexpected server bugs. Excludes stack traces in production to prevent information disclosure.
 
-### Internal Server Error (500)
-Returned when an unexpected runtime exception occurs. Sensitive system details and stack traces are excluded in production.
+---
 
-```json
-{
-  "success": false,
-  "message": "An unexpected error occurred",
-  "errors": []
-}
-```
+## 3. Frontend Error Normalization
 
-## Error Handling Pattern (Backend)
-
-Operational errors are raised by throwing instances of `AppError`:
+The centralized Axios client (`frontend/src/services/apiClient.js`) normalizes all HTTP error responses:
 
 ```javascript
-import { AppError } from '../middlewares/errorHandler.js';
-
-// Inside service methods:
-if (!note) {
-  throw new AppError('Note not found', 404);
-}
-
-if (isDescendant(noteId, newParentId)) {
-  throw new AppError('Cannot move note into its own descendant (circular reference)', 400);
+{
+  message: error.response?.data?.message || "An unexpected error occurred",
+  status: error.response?.status,
+  errors: error.response?.data?.errors || [],
+  originalError: error
 }
 ```
+This ensures React hooks in `features/` can display field errors or toast notifications consistently.

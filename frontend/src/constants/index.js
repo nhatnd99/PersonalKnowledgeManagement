@@ -4,7 +4,7 @@
  */
 
 // API
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 
 // Application
 export const APP_NAME = import.meta.env.VITE_APP_NAME || 'Knowledge App';
@@ -27,6 +27,7 @@ export const RELATIONSHIP_TYPES = {
 
 // Content formats
 export const CONTENT_FORMATS = {
+  JSON: 'json',
   HTML: 'html',
   MARKDOWN: 'markdown',
   PLAIN: 'plain',
