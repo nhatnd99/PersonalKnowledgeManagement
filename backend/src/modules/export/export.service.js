@@ -40,11 +40,42 @@ export function proseMirrorToMarkdown(doc) {
             if (mark.type === 'bold') text = `**${text}**`;
             if (mark.type === 'italic') text = `*${text}*`;
             if (mark.type === 'strike') text = `~~${text}~~`;
+            if (mark.type === 'underline') text = `<u>${text}</u>`;
+            if (mark.type === 'subscript') text = `<sub>${text}</sub>`;
+            if (mark.type === 'superscript') text = `<sup>${text}</sup>`;
+            if (mark.type === 'highlight') text = `<mark>${text}</mark>`;
             if (mark.type === 'link') text = `[${text}](${mark.attrs?.href || ''})`;
             if (mark.type === 'code') text = `\`${text}\``;
           }
         }
         return text;
+      }
+      case 'blockquote': {
+        const text = node.content ? renderNodes(node.content).trim() : '';
+        const quoted = text.split('\n').map((l) => `> ${l}`).join('\n');
+        return `${quoted}\n\n`;
+      }
+      case 'image': {
+        const alt = node.attrs?.alt || '';
+        const src = node.attrs?.src || '';
+        const title = node.attrs?.title ? ` "${node.attrs.title}"` : '';
+        return `![${alt}](${src}${title})\n\n`;
+      }
+      case 'table': {
+        if (!node.content || !node.content.length) return '';
+        const tableLines = [];
+        node.content.forEach((rowNode, rowIndex) => {
+          if (rowNode.type !== 'tableRow' || !rowNode.content) return;
+          const cells = rowNode.content.map((cell) =>
+            renderNodes(cell.content || []).trim().replace(/\|/g, '\\|')
+          );
+          tableLines.push(`| ${cells.join(' | ')} |`);
+          if (rowIndex === 0) {
+            const separators = cells.map(() => '---');
+            tableLines.push(`| ${separators.join(' | ')} |`);
+          }
+        });
+        return `${tableLines.join('\n')}\n\n`;
       }
       case 'codeBlock': {
         const lang = node.attrs?.language || '';

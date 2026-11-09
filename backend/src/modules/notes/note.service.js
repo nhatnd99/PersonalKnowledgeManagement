@@ -202,6 +202,46 @@ export async function updateNote(noteId, updateData) {
 }
 
 /**
+ * Update note content specifically (ProseMirror / TipTap JSON).
+ * Preserves title and metadata without modification.
+ * @param {string} noteId - Note UUID
+ * @param {Object} contentPayload - Payload containing content or contentJson
+ * @returns {Promise<Object>} Updated note record
+ */
+export async function updateNoteContent(noteId, contentPayload) {
+  const existingNote = await prisma.note.findUnique({
+    where: { id: noteId },
+  });
+  if (!existingNote) {
+    throw new AppError(`Note with ID ${noteId} not found`, 404);
+  }
+
+  const content =
+    contentPayload.contentJson !== undefined
+      ? contentPayload.contentJson
+      : contentPayload.content !== undefined
+      ? contentPayload.content
+      : null;
+
+  const contentFormat = contentPayload.contentFormat || existingNote.contentFormat || 'json';
+
+  const updatedNote = await prisma.note.update({
+    where: { id: noteId },
+    data: {
+      content,
+      contentFormat,
+    },
+    include: {
+      tags: {
+        include: { tag: true },
+      },
+    },
+  });
+
+  return updatedNote;
+}
+
+/**
  * Move a note to a new parent location with circular reference prevention.
  * @param {string} noteId - Note to move
  * @param {string|null} newParentId - Target parent note ID or null for root

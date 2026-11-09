@@ -30,6 +30,9 @@ router.use('/:noteId/tags', noteTagsRouter);
 // Export note
 router.get('/:noteId/export', noteIdValidation, validateRequest, exportNoteHandler);
 
+// Image insertion/validation endpoint
+router.post('/upload-image', noteController.handleImageUpload);
+
 router.get(
   '/',
   listNotesValidation,
@@ -56,6 +59,13 @@ router.patch(
   updateNoteValidation,
   validateRequest,
   noteController.updateNote
+);
+
+router.put(
+  '/:noteId/content',
+  noteIdValidation,
+  validateRequest,
+  noteController.updateNoteContent
 );
 
 router.patch(

@@ -1,3 +1,15 @@
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+/**
+ * Merge Tailwind classes with clsx.
+ * @param {...any} inputs - Class inputs
+ * @returns {string} Merged class string
+ */
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
+
 /**
  * Shared utility functions.
  * Keep these pure functions with no side effects.

@@ -39,6 +39,39 @@ export async function updateNote(req, res) {
 }
 
 /**
+ * PUT /api/v1/notes/:noteId/content
+ */
+export async function updateNoteContent(req, res) {
+  const note = await noteService.updateNoteContent(req.params.noteId, req.body);
+  return sendSuccess(res, note, 'Note content updated successfully');
+}
+
+/**
+ * POST /api/v1/notes/upload-image
+ * Validates external image URL or upload metadata safely.
+ */
+export async function handleImageUpload(req, res) {
+  const { url, alt = '', title = '' } = req.body;
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({
+      success: false,
+      message: 'Valid image URL is required',
+    });
+  }
+
+  // Sanitize and validate protocol
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('https://') && !trimmed.startsWith('http://')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Only HTTP/HTTPS image URLs are allowed',
+    });
+  }
+
+  return sendSuccess(res, { url: trimmed, alt, title }, 'Image verified successfully');
+}
+
+/**
  * PATCH /api/v1/notes/:noteId/move
  */
 export async function moveNote(req, res) {

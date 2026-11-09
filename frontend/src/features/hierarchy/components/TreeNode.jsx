@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
   ChevronDown,
@@ -11,6 +11,7 @@ import {
   Trash2,
   FolderPlus,
   FilePlus,
+  Network,
 } from 'lucide-react';
 import { NOTE_TYPES } from '../../../constants/index.js';
 
@@ -26,6 +27,7 @@ export function TreeNode({
   onCreateChild,
   onDeleteNote,
 }) {
+  const navigate = useNavigate();
   const isExpanded = expandedNodeIds.has(node.id);
   const hasChildren = node.children && node.children.length > 0;
   const isFolder = node.type === NOTE_TYPES.FOLDER;
@@ -133,6 +135,19 @@ export function TreeNode({
               className="absolute right-0 top-6 z-50 w-36 rounded-md border border-border bg-card p-1 shadow-lg text-xs"
               onMouseLeave={() => setShowMenu(false)}
             >
+              {isFolder && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+                    navigate(`/graph/folders/${node.id}`);
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded px-2 py-1 hover:bg-muted text-foreground"
+                >
+                  <Network className="h-3.5 w-3.5 text-primary" />
+                  Open Graph
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {

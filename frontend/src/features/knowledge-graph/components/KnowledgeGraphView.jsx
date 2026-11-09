@@ -1,19 +1,26 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { graphService } from '../services/graphService.js';
+import * as noteService from '../../notes/services/noteService.js';
 import { NoteNode } from './NoteNode.jsx';
+import { FolderNode } from './FolderNode.jsx';
 import { GraphToolbar } from './GraphToolbar.jsx';
-import { ArrowRight, FileText, Folder, Star, X, Sparkles } from 'lucide-react';
+import { GraphNodeDrawer } from './GraphNodeDrawer.jsx';
+import { GraphConnectModal } from './GraphConnectModal.jsx';
+import { Sparkles, FolderPlus, FilePlus } from 'lucide-react';
+import { NOTE_TYPES } from '../../../constants/index.js';
 
 const EDGE_COLORS = {
   RELATED_TO: '#64748b',
@@ -26,31 +33,60 @@ const EDGE_COLORS = {
 
 const nodeTypes = {
   noteNode: NoteNode,
+  folderNode: FolderNode,
 };
 
 /**
- * Calculates initial 2D layout positions for graph nodes in a multi-ring circle.
+ * Calculates initial 2D layout positions for scoped graph nodes.
+ * If there is a current scope folder node, it is placed at the center,
+ * while direct children are arranged in an orbit around it.
  */
-function layoutNodes(rawNodes) {
+function layoutScopedNodes(rawNodes, handlers) {
   const count = rawNodes.length;
   if (count === 0) return [];
 
   const centerX = 400;
   const centerY = 300;
-  const radius = Math.max(180, count * 35);
 
-  return rawNodes.map((node, index) => {
-    const angle = (index / count) * 2 * Math.PI;
+  const scopeFolderNode = rawNodes.find((n) => n.isScopeFolder);
+  const otherNodes = rawNodes.filter((n) => !n.isScopeFolder);
+
+  const formattedNodes = [];
+
+  // Place container folder node at center
+  if (scopeFolderNode) {
+    formattedNodes.push({
+      id: scopeFolderNode.id,
+      type: 'folderNode',
+      position: { x: centerX, y: centerY },
+      data: {
+        ...scopeFolderNode,
+        ...handlers,
+      },
+    });
+  }
+
+  // Position remaining nodes in an orbit circle
+  const orbitCount = otherNodes.length;
+  const radius = Math.max(220, orbitCount * 45);
+
+  otherNodes.forEach((node, index) => {
+    const angle = (index / Math.max(1, orbitCount)) * 2 * Math.PI;
     const x = centerX + radius * Math.cos(angle);
     const y = centerY + radius * Math.sin(angle);
 
-    return {
+    formattedNodes.push({
       id: node.id,
-      type: 'noteNode',
+      type: node.type === 'FOLDER' ? 'folderNode' : 'noteNode',
       position: { x, y },
-      data: node,
-    };
+      data: {
+        ...node,
+        ...handlers,
+      },
+    });
   });
+
+  return formattedNodes;
 }
 
 /**
@@ -86,41 +122,92 @@ function layoutEdges(rawEdges) {
   });
 }
 
-/**
- * KnowledgeGraphView: Interactive full-canvas graph visualization with React Flow.
- */
-export function KnowledgeGraphView() {
+function KnowledgeGraphCanvas() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { folderId } = useParams();
+  const reactFlowInstance = useReactFlow();
+
+  // Determine effective folder scope: 'root' if at /graph, /graph/root or no folderId
+  const effectiveFolderId = folderId || (location.pathname.includes('/folders/') ? null : 'root');
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
+  const [scopeData, setScopeData] = useState(null);
+  const [rawNodesList, setRawNodesList] = useState([]);
   const [relationshipType, setRelationshipType] = useState('');
   const [includeHierarchy, setIncludeHierarchy] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Connection modal state
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [connectSourceNode, setConnectSourceNode] = useState(null);
+
+  const handleOpenFolderGraph = useCallback(
+    (targetFolderId) => {
+      setSelectedNode(null);
+      if (targetFolderId === 'root') {
+        navigate('/graph/root');
+      } else {
+        navigate(`/graph/folders/${targetFolderId}`);
+      }
+    },
+    [navigate]
+  );
+
+  const handleOpenNote = useCallback(
+    (noteId) => {
+      navigate(`/notes/${noteId}`);
+    },
+    [navigate]
+  );
+
+  const handleOpenConnectModal = useCallback((sourceNode = null) => {
+    setConnectSourceNode(sourceNode || null);
+    setIsConnectModalOpen(true);
+  }, []);
+
+  const nodeHandlers = useMemo(
+    () => ({
+      onOpenFolderGraph: handleOpenFolderGraph,
+      onOpenNote: handleOpenNote,
+      onConnectNode: handleOpenConnectModal,
+    }),
+    [handleOpenFolderGraph, handleOpenNote, handleOpenConnectModal]
+  );
+
   const fetchGraphData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await graphService.getGraph({
+      const data = await graphService.getFolderGraph(effectiveFolderId, {
         relationshipType: relationshipType || undefined,
         includeHierarchy,
       });
 
-      const formattedNodes = layoutNodes(data.nodes || []);
+      setScopeData(data.scope);
+      setRawNodesList(data.nodes || []);
+
+      const formattedNodes = layoutScopedNodes(data.nodes || [], nodeHandlers);
       const formattedEdges = layoutEdges(data.edges || []);
 
       setNodes(formattedNodes);
       setEdges(formattedEdges);
+
+      // Keep selectedNode synchronized if already open
+      setSelectedNode((prev) => {
+        if (!prev) return null;
+        return data.nodes?.find((n) => n.id === prev.id) || null;
+      });
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to load graph');
     } finally {
       setIsLoading(false);
     }
-  }, [relationshipType, includeHierarchy, setNodes, setEdges]);
+  }, [effectiveFolderId, relationshipType, includeHierarchy, nodeHandlers, setNodes, setEdges]);
 
   useEffect(() => {
     fetchGraphData();
@@ -134,26 +221,55 @@ export function KnowledgeGraphView() {
     setSelectedNode(null);
   }, []);
 
-  const handleOpenNote = (noteId) => {
-    navigate(`/notes/${noteId}`);
+  const handleFitView = useCallback(() => {
+    if (reactFlowInstance) {
+      reactFlowInstance.fitView({ padding: 0.2, duration: 400 });
+    }
+  }, [reactFlowInstance]);
+
+  const handleCreateChild = async (type = NOTE_TYPES.NOTE) => {
+    try {
+      const parentId = effectiveFolderId === 'root' ? null : effectiveFolderId;
+      const title = type === NOTE_TYPES.FOLDER ? 'New Folder' : 'Untitled Note';
+      const res = await noteService.createNote({
+        title,
+        type,
+        parentId,
+      });
+      if (res.data?.id) {
+        if (type === NOTE_TYPES.NOTE) {
+          navigate(`/notes/${res.data.id}`);
+        } else {
+          fetchGraphData();
+        }
+      }
+    } catch (err) {
+      alert(`Could not create item: ${err.message}`);
+    }
   };
 
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
 
   return (
     <div className="relative h-full w-full bg-background overflow-hidden">
-      {/* Top Controls Toolbar */}
+      {/* Top Controls & Breadcrumbs Toolbar */}
       <GraphToolbar
+        scope={scopeData}
+        breadcrumbs={scopeData?.breadcrumbs || [{ id: 'root', title: 'Root' }]}
+        onNavigateBreadcrumb={handleOpenFolderGraph}
         relationshipType={relationshipType}
         onRelationshipTypeChange={setRelationshipType}
         includeHierarchy={includeHierarchy}
         onToggleHierarchy={() => setIncludeHierarchy(!includeHierarchy)}
         nodeCount={nodes.length}
         edgeCount={edges.length}
+        onRefresh={fetchGraphData}
+        onFitView={handleFitView}
+        onOpenConnectModal={() => handleOpenConnectModal(null)}
       />
 
       {error && (
-        <div className="absolute top-20 left-4 z-10 p-3 rounded bg-destructive/10 text-destructive text-xs border border-destructive/20 shadow">
+        <div className="absolute top-20 left-4 z-20 p-3.5 rounded-xl bg-destructive/10 text-destructive text-xs border border-destructive/20 shadow-lg backdrop-blur-md">
           {error}
         </div>
       )}
@@ -170,102 +286,79 @@ export function KnowledgeGraphView() {
         fitView
         className="bg-muted/10"
       >
-        <Background gap={16} size={1} color="currentColor" className="opacity-10 text-foreground" />
-        <Controls className="!bg-card !border-border !shadow-md" />
+        <Background gap={18} size={1} color="currentColor" className="opacity-10 text-foreground" />
+        <Controls className="!bg-card !border-border !shadow-lg !rounded-xl overflow-hidden" />
         <MiniMap
           nodeColor={(n) => (n.data?.type === 'FOLDER' ? '#f59e0b' : '#3b82f6')}
-          className="!bg-card/90 !border-border !rounded-lg !shadow-md"
+          className="!bg-card/90 !border-border !rounded-xl !shadow-lg backdrop-blur-md"
         />
       </ReactFlow>
 
       {/* Empty State Overlay */}
-      {!isLoading && nodes.length === 0 && (
+      {!isLoading && nodes.length <= 1 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="rounded-lg border border-border bg-card p-8 text-center max-w-sm shadow-xl pointer-events-auto">
+          <div className="rounded-2xl border border-border bg-card/95 p-8 text-center max-w-sm shadow-2xl pointer-events-auto backdrop-blur-md">
             <Sparkles className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-            <h3 className="text-base font-semibold text-foreground">Graph is empty</h3>
-            <p className="text-xs text-muted-foreground mt-1 mb-4">
-              Create notes and connect them with relationships to visualize your knowledge network.
+            <h3 className="text-base font-semibold text-foreground">
+              {nodes.length === 1 ? 'Folder is empty' : 'Workspace is empty'}
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 mb-5 leading-relaxed">
+              {nodes.length === 1
+                ? 'This folder does not contain any child notes or subfolders yet.'
+                : 'Create top-level notes and folders to begin building your knowledge graph.'}
             </p>
-            <button
-              type="button"
-              onClick={() => navigate('/notes')}
-              className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-xs font-medium"
-            >
-              Go to Notes
-            </button>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleCreateChild(NOTE_TYPES.NOTE)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
+              >
+                <FilePlus className="h-3.5 w-3.5" />
+                <span>Create Note</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCreateChild(NOTE_TYPES.FOLDER)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs font-medium hover:bg-muted transition-colors shadow-sm"
+              >
+                <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
+                <span>Create Subfolder</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Node Inspector Drawer on Selection */}
-      {selectedNode && (
-        <aside className="absolute right-4 top-4 z-20 w-80 rounded-lg border border-border bg-card/95 p-4 shadow-2xl backdrop-blur-md">
-          <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
-            <div className="flex items-center gap-1.5 min-w-0 pr-2">
-              {selectedNode.type === 'FOLDER' ? (
-                <Folder className="h-4 w-4 text-amber-500 shrink-0" />
-              ) : (
-                <FileText className="h-4 w-4 text-primary shrink-0" />
-              )}
-              <h4 className="font-semibold text-foreground text-sm truncate">
-                {selectedNode.title || 'Untitled Note'}
-              </h4>
-            </div>
+      <GraphNodeDrawer
+        selectedNode={selectedNode}
+        allEdges={edges}
+        allNodes={rawNodesList}
+        onClose={() => setSelectedNode(null)}
+        onOpenNote={handleOpenNote}
+        onOpenFolderGraph={handleOpenFolderGraph}
+        onConnectNode={(node) => handleOpenConnectModal(node)}
+      />
 
-            <button
-              type="button"
-              onClick={() => setSelectedNode(null)}
-              className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="space-y-3 text-xs">
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Type:</span>
-              <span className="font-medium text-foreground">{selectedNode.type}</span>
-            </div>
-
-            {selectedNode.isFavorite && (
-              <div className="flex items-center gap-1 text-amber-500 font-medium">
-                <Star className="h-3.5 w-3.5 fill-amber-500" />
-                <span>Starred Note</span>
-              </div>
-            )}
-
-            {selectedNode.tags && selectedNode.tags.length > 0 && (
-              <div>
-                <span className="text-muted-foreground block mb-1">Tags:</span>
-                <div className="flex flex-wrap gap-1">
-                  {selectedNode.tags.map((t) => (
-                    <span
-                      key={t.id}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-foreground border border-border"
-                    >
-                      <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: t.color || '#3b82f6' }}
-                      />
-                      <span>#{t.name}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => handleOpenNote(selectedNode.id)}
-              className="w-full mt-2 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-            >
-              <span>Open Note in Editor</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </aside>
-      )}
+      {/* Connect Modal */}
+      <GraphConnectModal
+        isOpen={isConnectModalOpen}
+        onClose={() => setIsConnectModalOpen(false)}
+        sourceNode={connectSourceNode}
+        availableNodes={rawNodesList}
+        onSuccess={fetchGraphData}
+      />
     </div>
+  );
+}
+
+/**
+ * KnowledgeGraphView with ReactFlowProvider wrapper.
+ */
+export function KnowledgeGraphView() {
+  return (
+    <ReactFlowProvider>
+      <KnowledgeGraphCanvas />
+    </ReactFlowProvider>
   );
 }

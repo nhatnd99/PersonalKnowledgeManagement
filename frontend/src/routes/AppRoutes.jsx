@@ -16,6 +16,8 @@ function AppRoutes() {
         <Route path="/notes" element={<NoteEditorView />} />
         <Route path="/notes/:noteId" element={<NoteEditorView />} />
         <Route path="/graph" element={<KnowledgeGraphView />} />
+        <Route path="/graph/root" element={<KnowledgeGraphView />} />
+        <Route path="/graph/folders/:folderId" element={<KnowledgeGraphView />} />
         <Route path="/search" element={<SearchView />} />
         <Route path="/tags" element={<TagsView />} />
         <Route path="*" element={<PlaceholderPage title="404 - Not Found" />} />
