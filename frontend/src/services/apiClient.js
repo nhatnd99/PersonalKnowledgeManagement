@@ -15,8 +15,11 @@ import axios from 'axios';
  * - Request interceptor: attach auth token when available (future)
  * - Response interceptor: normalize error responses
  */
+const rawBaseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+const baseURL = rawBaseURL.replace(/\/+$/, '');
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1',
+  baseURL,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
