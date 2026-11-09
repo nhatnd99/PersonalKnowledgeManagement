@@ -1,10 +1,61 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 /**
  * Load and validate environment variables.
- * Call this once at application startup before importing other modules.
+ * Loading Priority (highest to lowest):
+ * 1. process.env (already in environment, e.g. Vercel / CI)
+ * 2. .env.local (root or backend) - overrides standard .env
+ * 3. .env (backend or root)
  */
-dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const backendDir = path.resolve(__dirname, '../../');
+const rootDir = path.resolve(__dirname, '../../../');
+
+// 1. Load baseline .env files
+const envPaths = [
+  path.join(rootDir, '.env'),
+  path.join(backendDir, '.env'),
+];
+
+for (const p of envPaths) {
+  if (fs.existsSync(p)) {
+    dotenv.config({ path: p });
+  }
+}
+
+// 2. Load .env.local files with override: true (local overrides / Neon)
+const envLocalPaths = [
+  path.join(rootDir, '.env.local'),
+  path.join(backendDir, '.env.local'),
+];
+
+for (const p of envLocalPaths) {
+  if (fs.existsSync(p)) {
+    dotenv.config({ path: p, override: true });
+  }
+}
+
+// 3. Fallback directUrl mapping for Neon (if DATABASE_URL_UNPOOLED is present)
+if (process.env.DATABASE_URL_UNPOOLED && !process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = process.env.DATABASE_URL_UNPOOLED;
+}
+
+/**
+ * Parse CORS_ORIGIN into a string, array of strings, or wildcard.
+ * Allows comma-separated origins in environment variables (e.g. for Vercel preview + production).
+ */
+function parseCorsOrigin(originValue) {
+  if (!originValue || originValue === '*') return '*';
+  if (originValue.includes(',')) {
+    return originValue.split(',').map((o) => o.trim()).filter(Boolean);
+  }
+  return originValue;
+}
 
 /**
  * Validated environment configuration object.
@@ -20,10 +71,10 @@ export const env = {
 
   // Database (PostgreSQL / Neon via Prisma)
   databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/knowledge_app?schema=public',
-  directUrl: process.env.DIRECT_URL || process.env.DATABASE_URL,
+  directUrl: process.env.DIRECT_URL || process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL,
 
-  // CORS
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  // CORS (supports single origin, comma-separated array, or wildcard)
+  corsOrigin: parseCorsOrigin(process.env.CORS_ORIGIN) || 'http://localhost:5173',
 
   // Rate Limiting
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,

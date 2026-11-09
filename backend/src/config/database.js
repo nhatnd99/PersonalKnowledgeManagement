@@ -5,12 +5,21 @@ import { env } from './env.js';
  * PostgreSQL connection management via Prisma ORM.
  *
  * Supports both local PostgreSQL and managed PostgreSQL (e.g. Neon) via DATABASE_URL.
- * Maintains a single, application-managed PrismaClient instance.
+ * Maintains a single, application-managed PrismaClient instance via globalThis cache.
  */
 
-export const prisma = new PrismaClient({
-  log: env.isDevelopment ? ['warn', 'error'] : ['error'],
-});
+const globalForPrisma = globalThis;
+
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient({
+    log: env.isDevelopment ? ['warn', 'error'] : ['error'],
+  });
+
+// In serverless environments, store the client on globalThis so warm lambdas reuse the instance and connection pool
+if (!globalForPrisma.prisma) {
+  globalForPrisma.prisma = prisma;
+}
 
 /**
  * Establish database connection using Prisma Client.

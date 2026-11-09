@@ -90,6 +90,16 @@ export function globalErrorHandler(err, _req, res, _next) {
     });
   }
 
+  // Prisma Connection / Initialization Errors (P1001, P1000, PrismaClientInitializationError)
+  if (err.name === 'PrismaClientInitializationError' || err.code === 'P1001' || err.code === 'P1000') {
+    console.error('[Database Error] Prisma connection failed:', err.message);
+    return res.status(503).json({
+      success: false,
+      message: 'Database service is temporarily unavailable',
+      errors: [],
+    });
+  }
+
   // Unknown / unexpected error — do not expose internals in production
   console.error('[Error] Unexpected error:', err);
 
