@@ -189,6 +189,82 @@ describe('Notes API Endpoints (/api/v1/notes)', () => {
     });
   });
 
+  describe('PUT /api/v1/notes/:noteId/content', () => {
+    it('persists rich formatted ProseMirror content and returns 200', async () => {
+      const richContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'heading',
+            attrs: { level: 1 },
+            content: [{ type: 'text', text: 'Advanced Rich Text Document' }],
+          },
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                marks: [{ type: 'bold' }, { type: 'highlight', attrs: { color: '#FEF08A' } }],
+                text: 'Highlighted text',
+              },
+              {
+                type: 'text',
+                marks: [
+                  {
+                    type: 'internalNoteLink',
+                    attrs: { noteId: VALID_FOLDER_ID, noteTitle: 'Target Folder' },
+                  },
+                ],
+                text: 'Internal Note Link',
+              },
+            ],
+          },
+          {
+            type: 'table',
+            content: [
+              {
+                type: 'tableRow',
+                content: [
+                  { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Col 1' }] }] },
+                  { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Col 2' }] }] },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const res = await request(app)
+        .put(`/api/v1/notes/${VALID_NOTE_ID}/content`)
+        .send({ content: richContent });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.content).toEqual(richContent);
+    });
+  });
+
+  describe('POST /api/v1/notes/upload-image', () => {
+    it('validates and accepts safe HTTPS image URLs', async () => {
+      const res = await request(app)
+        .post('/api/v1/notes/upload-image')
+        .send({ url: 'https://images.unsplash.com/photo-12345' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.url).toBe('https://images.unsplash.com/photo-12345');
+    });
+
+    it('rejects invalid or unsafe image URLs', async () => {
+      const res = await request(app)
+        .post('/api/v1/notes/upload-image')
+        .send({ url: 'javascript:alert(1)' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+  });
+
   describe('DELETE /api/v1/notes/:noteId', () => {
     it('deletes note with 204 No Content', async () => {
       const res = await request(app)
