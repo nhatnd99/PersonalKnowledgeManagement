@@ -176,7 +176,7 @@ export function TreeNode({
                 type="button"
                 onClick={() => {
                   setShowMenu(false);
-                  onDeleteNote(node.id);
+                  onDeleteNote(node);
                 }}
                 className="flex w-full items-center gap-1.5 rounded px-2 py-1 hover:bg-destructive/10 text-destructive"
               >

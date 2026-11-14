@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useNote } from '../hooks/useNote.js';
 import { useAutoSave } from '../hooks/useAutoSave.js';
 import { useRelationships } from '../../relationships/hooks/useRelationships.js';
@@ -10,8 +10,9 @@ import { RelationshipsPanel } from '../../relationships/components/Relationships
 import { BacklinksPanel } from '../../backlinks/components/BacklinksPanel.jsx';
 import { ConnectionsDrawer } from '../../connections/components/ConnectionsDrawer.jsx';
 import { NoteTagsSelector } from '../../tags/components/NoteTagsSelector.jsx';
+import { DeleteConfirmModal } from '../components/DeleteConfirmModal.jsx';
 import { exportNote } from '../services/noteService.js';
-import { Star, FileText, Share2, Download } from 'lucide-react';
+import { Star, FileText, Share2, Download, Trash2 } from 'lucide-react';
 
 /**
  * NoteEditorView: Workspace page displaying note header, editable title,
@@ -20,6 +21,7 @@ import { Star, FileText, Share2, Download } from 'lucide-react';
  */
 export function NoteEditorView() {
   const { noteId } = useParams();
+  const navigate = useNavigate();
   const { note, isLoading, error, saveNote, refetch: refetchNote } = useNote(noteId);
   const {
     outgoing,
@@ -32,6 +34,7 @@ export function NoteEditorView() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState(null);
   const [showSidePanel, setShowSidePanel] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const activeNoteIdRef = useRef(noteId);
   const titleRef = useRef(title);
@@ -187,6 +190,18 @@ export function NoteEditorView() {
                 <span>Export MD</span>
               </button>
 
+              {/* Delete Button */}
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(true)}
+                title="Delete note"
+                aria-label="Delete note"
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border border-destructive/20 hover:border-destructive/40 bg-background hover:bg-destructive/10 text-destructive transition-colors"
+              >
+                <Trash2 className="h-3 w-3" />
+                <span>Delete</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowSidePanel(true)}
@@ -259,6 +274,17 @@ export function NoteEditorView() {
         onItemUpdated={() => {
           refetchNote();
           refetchRelationships();
+        }}
+      />
+
+      {/* Cascade Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        noteId={note.id}
+        initialTarget={note}
+        onDeleted={() => {
+          navigate('/notes');
         }}
       />
     </div>

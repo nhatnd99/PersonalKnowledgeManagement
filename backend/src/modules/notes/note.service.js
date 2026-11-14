@@ -293,20 +293,111 @@ export async function moveNote(noteId, newParentId) {
 
 /**
  * Delete a note.
- * Policy:
- * - cascade=false (default): re-parents direct children to the deleted note's parentId.
- * - cascade=true: recursively deletes descendant notes.
- * - In ALL cases: associated NoteRelationship records where note is source or target are cascade deleted by DB foreign keys.
- * @param {string} noteId - Note to delete
- * @param {Object} options - { cascade: boolean }
- * @returns {Promise<void>}
+/**
+ * Recursively collects all descendant entities (notes and folders) at all nesting levels.
+ * Uses iterative breadth-first collection with visited set to prevent cycles and stack overflows.
+ * @param {string} parentId - Parent note/folder UUID
+ * @returns {Promise<Array<{ id: string, title: string, type: string, parentId: string }>>}
+ */
+export async function getDescendantEntities(parentId) {
+  const allDescendants = [];
+  const visitedIds = new Set([parentId]);
+  let currentLevelParentIds = [parentId];
+
+  while (currentLevelParentIds.length > 0) {
+    const children = await prisma.note.findMany({
+      where: { parentId: { in: currentLevelParentIds } },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        parentId: true,
+      },
+    });
+
+    // Guard against cycles or repeated mock data
+    const newChildren = children.filter((c) => !visitedIds.has(c.id));
+    if (newChildren.length === 0) break;
+
+    for (const child of newChildren) {
+      visitedIds.add(child.id);
+      allDescendants.push(child);
+    }
+
+    currentLevelParentIds = newChildren.map((c) => c.id);
+  }
+
+  return allDescendants;
+}
+
+/**
+ * Computes deletion preview metrics (descendant folder/note counts and affected relationships).
+ * @param {string} noteId - Target entity UUID
+ * @returns {Promise<Object>}
+ */
+export async function getDeletePreview(noteId) {
+  const target = await prisma.note.findUnique({
+    where: { id: noteId },
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      parentId: true,
+    },
+  });
+
+  if (!target) {
+    throw new AppError(`Note with ID ${noteId} not found`, 404);
+  }
+
+  const descendants = await getDescendantEntities(noteId);
+  const descendantFolders = descendants.filter((d) => d.type === 'FOLDER');
+  const descendantNotes = descendants.filter((d) => d.type === 'NOTE');
+
+  const allIdsToDelete = [noteId, ...descendants.map((d) => d.id)];
+
+  const affectedRelationshipsCount = prisma.noteRelationship?.count
+    ? await prisma.noteRelationship.count({
+        where: {
+          OR: [
+            { sourceNoteId: { in: allIdsToDelete } },
+            { targetNoteId: { in: allIdsToDelete } },
+          ],
+        },
+      })
+    : 0;
+
+  return {
+    target,
+    descendants: {
+      folders: descendantFolders.length,
+      notes: descendantNotes.length,
+      total: descendants.length,
+    },
+    affectedRelationships: affectedRelationshipsCount,
+    totalEntitiesToDelete: allIdsToDelete.length,
+  };
+}
+
+/**
+ * Deletes a note or folder with comprehensive cascade deletion and semantic relationship cleanup.
+ * Executed atomically inside a database transaction.
+ * @param {string} noteId - UUID of the entity to delete
+ * @param {Object} [options] - Options
+ * @param {boolean} [options.cascade=true] - Whether to recursively delete descendants (defaults to true)
+ * @returns {Promise<{ success: boolean, deletedEntitiesCount: number }>}
  */
 export async function deleteNote(noteId, options = {}) {
-  const cascade = options.cascade === true || options.cascade === 'true';
+  const cascade = options.cascade !== false && options.cascade !== 'false';
 
   const note = await prisma.note.findUnique({
     where: { id: noteId },
-    include: { children: { select: { id: true } } },
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      parentId: true,
+    },
   });
 
   if (!note) {
@@ -314,25 +405,108 @@ export async function deleteNote(noteId, options = {}) {
   }
 
   if (cascade) {
-    // Collect all descendant IDs recursively
-    const descendantIds = await getDescendantIds(noteId);
-    const allIdsToDelete = [noteId, ...descendantIds];
+    // 1. Collect all descendant entities across all nesting depths
+    const descendants = await getDescendantEntities(noteId);
+    const allIdsToDelete = [noteId, ...descendants.map((d) => d.id)];
 
-    // Delete notes (Prisma CASCADE will clean up note_relationships and note_tags)
-    await prisma.note.deleteMany({
-      where: { id: { in: allIdsToDelete } },
-    });
+    // 2. Perform atomic cascade deletion within a single transaction
+    const operations = [];
+
+    // Step A: Explicitly delete all semantic relationships referencing any deleted entity
+    // Crucial: Relationships where deleted entity is source OR target are deleted,
+    // but foreign notes/folders outside allIdsToDelete remain untouched!
+    if (prisma.noteRelationship?.deleteMany) {
+      operations.push(
+        prisma.noteRelationship.deleteMany({
+          where: {
+            OR: [
+              { sourceNoteId: { in: allIdsToDelete } },
+              { targetNoteId: { in: allIdsToDelete } },
+            ],
+          },
+        })
+      );
+    }
+
+    // Step B: Clean up note tags associations
+    if (prisma.noteTag?.deleteMany) {
+      operations.push(
+        prisma.noteTag.deleteMany({
+          where: { noteId: { in: allIdsToDelete } },
+        })
+      );
+    }
+
+    // Step C: Nullify parentId of deleted entities to prevent self-referential FK locks
+    if (prisma.note?.updateMany) {
+      operations.push(
+        prisma.note.updateMany({
+          where: { id: { in: allIdsToDelete } },
+          data: { parentId: null },
+        })
+      );
+    }
+
+    // Step D: Batch delete all entities in the deletion set
+    if (prisma.note?.deleteMany) {
+      operations.push(
+        prisma.note.deleteMany({
+          where: { id: { in: allIdsToDelete } },
+        })
+      );
+    }
+
+    await prisma.$transaction(operations);
+
+    return {
+      success: true,
+      deletedEntitiesCount: allIdsToDelete.length,
+    };
   } else {
-    // Default deletion: re-parent direct children to the deleted note's parent
-    await prisma.$transaction([
-      prisma.note.updateMany({
-        where: { parentId: noteId },
-        data: { parentId: note.parentId },
-      }),
-      prisma.note.delete({
-        where: { id: noteId },
-      }),
-    ]);
+    // Reparent direct children to parent
+    const operations = [];
+
+    if (prisma.noteRelationship?.deleteMany) {
+      operations.push(
+        prisma.noteRelationship.deleteMany({
+          where: {
+            OR: [{ sourceNoteId: noteId }, { targetNoteId: noteId }],
+          },
+        })
+      );
+    }
+
+    if (prisma.noteTag?.deleteMany) {
+      operations.push(
+        prisma.noteTag.deleteMany({
+          where: { noteId },
+        })
+      );
+    }
+
+    if (prisma.note?.updateMany) {
+      operations.push(
+        prisma.note.updateMany({
+          where: { parentId: noteId },
+          data: { parentId: note.parentId },
+        })
+      );
+    }
+
+    if (prisma.note?.delete) {
+      operations.push(
+        prisma.note.delete({
+          where: { id: noteId },
+        })
+      );
+    }
+
+    await prisma.$transaction(operations);
+
+    return {
+      success: true,
+      deletedEntitiesCount: 1,
+    };
   }
 }
 
@@ -365,18 +539,7 @@ async function assertNoCycle(noteId, candidateParentId) {
  * @param {string} parentId
  * @returns {Promise<string[]>}
  */
-async function getDescendantIds(parentId) {
-  const descendants = [];
-  const directChildren = await prisma.note.findMany({
-    where: { parentId },
-    select: { id: true },
-  });
-
-  for (const child of directChildren) {
-    descendants.push(child.id);
-    const subDescendants = await getDescendantIds(child.id);
-    descendants.push(...subDescendants);
-  }
-
-  return descendants;
+export async function getDescendantIds(parentId) {
+  const descendants = await getDescendantEntities(parentId);
+  return descendants.map((d) => d.id);
 }

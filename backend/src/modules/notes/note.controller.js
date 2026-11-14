@@ -81,10 +81,20 @@ export async function moveNote(req, res) {
 }
 
 /**
+ * GET /api/v1/notes/:noteId/delete-preview
+ */
+export async function getDeletePreview(req, res) {
+  const preview = await noteService.getDeletePreview(req.params.noteId);
+  return sendSuccess(res, preview);
+}
+
+/**
  * DELETE /api/v1/notes/:noteId
  */
 export async function deleteNote(req, res) {
   const { cascade } = req.query;
-  await noteService.deleteNote(req.params.noteId, { cascade });
+  await noteService.deleteNote(req.params.noteId, {
+    cascade: cascade !== 'false',
+  });
   return sendNoContent(res);
 }

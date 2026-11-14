@@ -80,12 +80,22 @@ export async function moveNote(noteId, newParentId) {
 }
 
 /**
- * Delete a note.
+ * Get deletion preview metrics (descendants and affected relationships).
  * @param {string} noteId - Note UUID
- * @param {boolean} [cascade=false] - Whether to recursively delete descendants
+ * @returns {Promise<{ success: boolean, data: Object }>}
+ */
+export async function getDeletePreview(noteId) {
+  const response = await apiClient.get(`${NOTES_ENDPOINT}/${noteId}/delete-preview`);
+  return response.data;
+}
+
+/**
+ * Delete a note or folder with cascade deletion and semantic cleanup.
+ * @param {string} noteId - Note UUID
+ * @param {boolean} [cascade=true] - Whether to recursively delete descendants
  * @returns {Promise<void>}
  */
-export async function deleteNote(noteId, cascade = false) {
+export async function deleteNote(noteId, cascade = true) {
   const response = await apiClient.delete(`${NOTES_ENDPOINT}/${noteId}`, {
     params: { cascade },
   });

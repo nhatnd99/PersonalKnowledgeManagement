@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHierarchy } from '../hooks/useHierarchy.js';
 import { TreeNode } from './TreeNode.jsx';
 import { RefreshCw } from 'lucide-react';
 import * as noteService from '../../notes/services/noteService.js';
 import { NOTE_TYPES } from '../../../constants/index.js';
+import { DeleteConfirmModal } from '../../notes/components/DeleteConfirmModal.jsx';
 
 /**
  * HierarchyTree: Main component rendering full nested outline of notes and folders.
@@ -20,6 +22,7 @@ export function HierarchyTree() {
   } = useHierarchy();
 
   const navigate = useNavigate();
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const handleCreateChild = async (parentId, type = NOTE_TYPES.NOTE) => {
     try {
@@ -38,19 +41,17 @@ export function HierarchyTree() {
     }
   };
 
-  const handleDeleteNote = async (noteId) => {
-    const confirmDelete = window.confirm(
-      'Are you sure you want to delete this note? Child notes will be moved to the parent.'
-    );
-    if (!confirmDelete) return;
-
-    try {
-      await noteService.deleteNote(noteId, false);
-      await reload();
-      navigate('/notes');
-    } catch (err) {
-      alert(`Delete failed: ${err.message}`);
+  const handleDeleteNote = (target) => {
+    if (typeof target === 'string') {
+      setDeleteTarget({ id: target, title: 'Item', type: NOTE_TYPES.NOTE });
+    } else {
+      setDeleteTarget(target);
     }
+  };
+
+  const handleDeleted = async () => {
+    await reload();
+    navigate('/notes');
   };
 
   const handleRootDrop = async (e) => {
@@ -107,6 +108,14 @@ export function HierarchyTree() {
           ))
         )}
       </div>
+
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        noteId={deleteTarget?.id}
+        initialTarget={deleteTarget}
+        onDeleted={handleDeleted}
+      />
     </div>
   );
 }

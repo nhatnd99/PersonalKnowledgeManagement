@@ -48,6 +48,13 @@ router.post(
 );
 
 router.get(
+  '/:noteId/delete-preview',
+  noteIdValidation,
+  validateRequest,
+  noteController.getDeletePreview
+);
+
+router.get(
   '/:noteId',
   noteIdValidation,
   validateRequest,
