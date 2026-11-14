@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -168,24 +168,10 @@ export function NoteEditor({ initialContent, onChange, editable = true }) {
     editorProps: {
       attributes: {
         class:
-          'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[420px] px-8 py-6 text-foreground font-normal leading-relaxed',
+          'focus:outline-none min-h-[420px] px-8 py-6 text-foreground font-normal leading-relaxed',
       },
     },
   });
-
-  // Synchronize external note content when switching active note
-  useEffect(() => {
-    if (editor && initialContent !== undefined) {
-      const currentJson = JSON.stringify(editor.getJSON());
-      const nextJson = JSON.stringify(initialContent || { type: 'doc', content: [] });
-
-      if (currentJson !== nextJson) {
-        isUpdatingRef.current = true;
-        editor.commands.setContent(initialContent || { type: 'doc', content: [] });
-        isUpdatingRef.current = false;
-      }
-    }
-  }, [editor, initialContent]);
 
   // Handle in-text internal note link clicks
   const handleEditorClick = useCallback(

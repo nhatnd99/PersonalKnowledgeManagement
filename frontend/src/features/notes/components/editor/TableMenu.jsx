@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { Table as TableIcon, Plus, Trash2, ChevronDown } from 'lucide-react';
 
 export function TableMenu({ editor }) {
@@ -38,9 +39,10 @@ export function TableMenu({ editor }) {
     <div className="relative inline-block" ref={menuRef}>
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setIsOpen(!isOpen)}
         title="Table Operations"
-        className={`flex h-7 items-center gap-1 rounded px-2 text-xs font-medium border border-border ${
+        className={`flex h-7 items-center gap-1 rounded px-2 text-xs font-medium border border-border transition-colors ${
           isInsideTable ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-foreground'
         }`}
       >
@@ -50,7 +52,10 @@ export function TableMenu({ editor }) {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border border-border bg-card p-2.5 shadow-lg text-xs space-y-2">
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border border-border bg-card p-2.5 shadow-lg text-xs space-y-2 animate-in fade-in-50 zoom-in-95 duration-150"
+        >
           {!isInsideTable ? (
             <div>
               <div className="font-semibold text-foreground mb-2">Insert Table</div>
@@ -80,6 +85,7 @@ export function TableMenu({ editor }) {
               </div>
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleInsertTable}
                 className="w-full h-7 rounded bg-primary text-primary-foreground font-medium hover:bg-primary/90 flex items-center justify-center gap-1"
               >
@@ -94,6 +100,7 @@ export function TableMenu({ editor }) {
               <div className="grid grid-cols-2 gap-1">
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().addRowBefore().run();
                     setIsOpen(false);
@@ -104,6 +111,7 @@ export function TableMenu({ editor }) {
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().addRowAfter().run();
                     setIsOpen(false);
@@ -114,6 +122,7 @@ export function TableMenu({ editor }) {
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().addColumnBefore().run();
                     setIsOpen(false);
@@ -124,6 +133,7 @@ export function TableMenu({ editor }) {
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().addColumnAfter().run();
                     setIsOpen(false);
@@ -137,6 +147,7 @@ export function TableMenu({ editor }) {
               <div className="pt-1 border-t border-border grid grid-cols-2 gap-1">
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().deleteRow().run();
                     setIsOpen(false);
@@ -147,6 +158,7 @@ export function TableMenu({ editor }) {
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().deleteColumn().run();
                     setIsOpen(false);
@@ -157,6 +169,7 @@ export function TableMenu({ editor }) {
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().mergeCells().run();
                     setIsOpen(false);
@@ -167,6 +180,7 @@ export function TableMenu({ editor }) {
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().splitCell().run();
                     setIsOpen(false);
@@ -180,6 +194,7 @@ export function TableMenu({ editor }) {
               <div className="pt-1 border-t border-border">
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     editor.chain().focus().deleteTable().run();
                     setIsOpen(false);
@@ -197,3 +212,7 @@ export function TableMenu({ editor }) {
     </div>
   );
 }
+
+TableMenu.propTypes = {
+  editor: PropTypes.object,
+};

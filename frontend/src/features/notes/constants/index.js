@@ -8,7 +8,7 @@ export const NOTE_TITLE_MAX_LENGTH = 500;
 export const NOTE_TITLE_MIN_LENGTH = 1;
 
 export const AUTO_SAVE_STATUS = {
-  IDLE: 'idle',
+  UNSAVED: 'unsaved',
   SAVING: 'saving',
   SAVED: 'saved',
   ERROR: 'error',

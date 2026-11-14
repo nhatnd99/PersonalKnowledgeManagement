@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useNote } from '../hooks/useNote.js';
 import { useAutoSave } from '../hooks/useAutoSave.js';
@@ -33,29 +33,58 @@ export function NoteEditorView() {
   const [content, setContent] = useState(null);
   const [showSidePanel, setShowSidePanel] = useState(false);
 
-  // Auto-save hook
-  const { status, lastSavedAt, triggerSave } = useAutoSave(async (data) => {
-    await saveNote(data);
-  });
+  const activeNoteIdRef = useRef(noteId);
+  const titleRef = useRef(title);
+  const contentRef = useRef(content);
 
-  // Sync state when loaded note changes
+  // Auto-save hook saving to the exact note ID that generated the edits
+  const { status, lastSavedAt, triggerSave, flushSave, retrySave } = useAutoSave(
+    async (data) => {
+      if (activeNoteIdRef.current) {
+        await saveNote(data, activeNoteIdRef.current);
+      }
+    },
+    1000
+  );
+
+  // Sync state when loaded note changes or navigation to different note occurs
   useEffect(() => {
-    if (note) {
+    if (note && note.id !== activeNoteIdRef.current) {
+      activeNoteIdRef.current = note.id;
       setTitle(note.title || '');
       setContent(note.content || null);
+      titleRef.current = note.title || '';
+      contentRef.current = note.content || null;
+    } else if (note && !activeNoteIdRef.current) {
+      activeNoteIdRef.current = note.id;
+      setTitle(note.title || '');
+      setContent(note.content || null);
+      titleRef.current = note.title || '';
+      contentRef.current = note.content || null;
     }
   }, [note]);
+
+  // Flush any pending save on navigation or unmount
+  useEffect(() => {
+    return () => {
+      flushSave();
+    };
+  }, [noteId, flushSave]);
 
   const handleTitleChange = (e) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
-    triggerSave({ title: newTitle, content });
+    titleRef.current = newTitle;
+    triggerSave({ title: newTitle, content: contentRef.current });
   };
 
-  const handleContentChange = (newContentJson) => {
-    setContent(newContentJson);
-    triggerSave({ title, content: newContentJson });
-  };
+  const handleContentChange = useCallback(
+    (newContentJson) => {
+      contentRef.current = newContentJson;
+      triggerSave({ title: titleRef.current, content: newContentJson });
+    },
+    [triggerSave]
+  );
 
   const handleToggleFavorite = async () => {
     if (!note) return;
@@ -130,7 +159,11 @@ export function NoteEditorView() {
             <Breadcrumbs note={note} />
 
             <div className="flex items-center gap-3">
-              <AutoSaveIndicator status={status} lastSavedAt={lastSavedAt} />
+              <AutoSaveIndicator
+                status={status}
+                lastSavedAt={lastSavedAt}
+                onRetry={retrySave}
+              />
 
               <button
                 type="button"
@@ -189,7 +222,8 @@ export function NoteEditorView() {
 
           {/* TipTap Rich Text Editor */}
           <NoteEditor
-            initialContent={content}
+            key={note.id}
+            initialContent={note.content}
             onChange={handleContentChange}
           />
 

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { Highlighter, X } from 'lucide-react';
 import { HIGHLIGHT_COLORS } from './ColorConstants.js';
 
@@ -50,9 +51,10 @@ export function HighlightColorPicker({ editor }) {
     <div className="relative inline-block" ref={popoverRef}>
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => setIsOpen(!isOpen)}
         title="Highlight Color"
-        className={`flex h-7 items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-muted ${
+        className={`flex h-7 items-center gap-1 rounded px-1.5 py-0.5 text-xs hover:bg-muted transition-colors ${
           isHighlighted ? 'bg-muted' : ''
         }`}
       >
@@ -64,7 +66,10 @@ export function HighlightColorPicker({ editor }) {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-52 rounded-md border border-border bg-card p-3 shadow-lg">
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          className="absolute left-0 top-full z-50 mt-1 w-52 rounded-md border border-border bg-card p-3 shadow-lg animate-in fade-in-50 zoom-in-95 duration-150"
+        >
           <div className="mb-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
             Highlight Color
           </div>
@@ -73,6 +78,7 @@ export function HighlightColorPicker({ editor }) {
               <button
                 key={c.name}
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelectColor(c.value)}
                 title={c.name}
                 className="h-6 w-6 rounded border border-border hover:scale-110 transition-transform relative flex items-center justify-center"
@@ -104,6 +110,7 @@ export function HighlightColorPicker({ editor }) {
           {isHighlighted && (
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleSelectColor(null)}
               className="mt-2 w-full text-center text-[11px] text-muted-foreground hover:text-foreground py-1 border-t border-border"
             >
@@ -115,3 +122,7 @@ export function HighlightColorPicker({ editor }) {
     </div>
   );
 }
+
+HighlightColorPicker.propTypes = {
+  editor: PropTypes.object,
+};

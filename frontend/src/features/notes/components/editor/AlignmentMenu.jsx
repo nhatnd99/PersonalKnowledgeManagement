@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { AlignLeft, AlignCenter, AlignRight, AlignJustify } from 'lucide-react';
 
 export function AlignmentMenu({ editor }) {
@@ -7,9 +8,10 @@ export function AlignmentMenu({ editor }) {
     <div className="flex items-center gap-0.5 border border-border rounded p-0.5 bg-background">
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => editor.chain().focus().setTextAlign('left').run()}
         title="Align Left"
-        className={`h-6 w-6 rounded flex items-center justify-center text-xs ${
+        className={`h-6 w-6 rounded flex items-center justify-center text-xs transition-colors ${
           editor.isActive({ textAlign: 'left' }) ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-foreground'
         }`}
       >
@@ -18,9 +20,10 @@ export function AlignmentMenu({ editor }) {
 
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => editor.chain().focus().setTextAlign('center').run()}
         title="Align Center"
-        className={`h-6 w-6 rounded flex items-center justify-center text-xs ${
+        className={`h-6 w-6 rounded flex items-center justify-center text-xs transition-colors ${
           editor.isActive({ textAlign: 'center' }) ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-foreground'
         }`}
       >
@@ -29,9 +32,10 @@ export function AlignmentMenu({ editor }) {
 
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => editor.chain().focus().setTextAlign('right').run()}
         title="Align Right"
-        className={`h-6 w-6 rounded flex items-center justify-center text-xs ${
+        className={`h-6 w-6 rounded flex items-center justify-center text-xs transition-colors ${
           editor.isActive({ textAlign: 'right' }) ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-foreground'
         }`}
       >
@@ -40,9 +44,10 @@ export function AlignmentMenu({ editor }) {
 
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => editor.chain().focus().setTextAlign('justify').run()}
         title="Justify"
-        className={`h-6 w-6 rounded flex items-center justify-center text-xs ${
+        className={`h-6 w-6 rounded flex items-center justify-center text-xs transition-colors ${
           editor.isActive({ textAlign: 'justify' }) ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-foreground'
         }`}
       >
@@ -51,3 +56,7 @@ export function AlignmentMenu({ editor }) {
     </div>
   );
 }
+
+AlignmentMenu.propTypes = {
+  editor: PropTypes.object,
+};
