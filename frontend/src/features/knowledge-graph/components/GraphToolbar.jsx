@@ -10,6 +10,7 @@ import {
   Plus,
   Maximize2,
   Home,
+  FolderTree,
 } from 'lucide-react';
 
 const RELATIONSHIP_FILTERS = [
@@ -37,13 +38,27 @@ export function GraphToolbar({
   onRefresh,
   onFitView,
   onOpenConnectModal,
+  foldersList = [],
+  onBackToFolderSelection,
 }) {
   const isRoot = !scope || scope.id === 'root';
 
   return (
     <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-      {/* Left side: Breadcrumb & Scope title */}
+      {/* Left side: Breadcrumb & Scope title & Switcher */}
       <div className="flex items-center gap-2 rounded-xl border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur-md pointer-events-auto">
+        {onBackToFolderSelection && (
+          <button
+            type="button"
+            onClick={onBackToFolderSelection}
+            title="Back to Folder Selection"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mr-1 text-xs font-medium"
+          >
+            <FolderTree className="h-3.5 w-3.5 text-primary" />
+            <span className="hidden sm:inline">Folders</span>
+          </button>
+        )}
+
         {!isRoot && (
           <button
             type="button"
@@ -62,8 +77,25 @@ export function GraphToolbar({
           </button>
         )}
 
+        {/* Quick Folder Switcher Dropdown */}
+        {foldersList.length > 0 && (
+          <select
+            value={scope?.id || 'root'}
+            onChange={(e) => onNavigateBreadcrumb(e.target.value)}
+            className="rounded-md border border-input bg-background/80 px-2 py-0.5 text-xs text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-ring max-w-[150px] truncate"
+            title="Switch Folder Graph"
+          >
+            <option value="root">📂 Root Workspace</option>
+            {foldersList.map((f) => (
+              <option key={f.id} value={f.id}>
+                📁 {f.title} ({f.childCount || 0})
+              </option>
+            ))}
+          </select>
+        )}
+
         {/* Breadcrumb path */}
-        <nav aria-label="Graph Scope Breadcrumbs" className="flex items-center gap-1.5 text-xs">
+        <nav aria-label="Graph Scope Breadcrumbs" className="hidden md:flex items-center gap-1.5 text-xs">
           {breadcrumbs.map((crumb, idx) => {
             const isLast = idx === breadcrumbs.length - 1;
             const isCrumbRoot = crumb.id === 'root';
@@ -200,4 +232,6 @@ GraphToolbar.propTypes = {
   onRefresh: PropTypes.func,
   onFitView: PropTypes.func,
   onOpenConnectModal: PropTypes.func,
+  foldersList: PropTypes.array,
+  onBackToFolderSelection: PropTypes.func,
 };

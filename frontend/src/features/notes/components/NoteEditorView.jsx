@@ -8,9 +8,10 @@ import { AutoSaveIndicator } from '../components/AutoSaveIndicator.jsx';
 import { Breadcrumbs } from '../../hierarchy/components/Breadcrumbs.jsx';
 import { RelationshipsPanel } from '../../relationships/components/RelationshipsPanel.jsx';
 import { BacklinksPanel } from '../../backlinks/components/BacklinksPanel.jsx';
+import { ConnectionsDrawer } from '../../connections/components/ConnectionsDrawer.jsx';
 import { NoteTagsSelector } from '../../tags/components/NoteTagsSelector.jsx';
 import { exportNote } from '../services/noteService.js';
-import { Star, FileText, Share2, PanelRightClose, PanelRightOpen, Download } from 'lucide-react';
+import { Star, FileText, Share2, Download } from 'lucide-react';
 
 /**
  * NoteEditorView: Workspace page displaying note header, editable title,
@@ -19,12 +20,13 @@ import { Star, FileText, Share2, PanelRightClose, PanelRightOpen, Download } fro
  */
 export function NoteEditorView() {
   const { noteId } = useParams();
-  const { note, isLoading, error, saveNote } = useNote(noteId);
+  const { note, isLoading, error, saveNote, refetch: refetchNote } = useNote(noteId);
   const {
     outgoing,
     incoming,
     addRelationship,
     removeRelationship,
+    refetch: refetchRelationships,
   } = useRelationships(noteId);
 
   const [title, setTitle] = useState('');
@@ -154,8 +156,8 @@ export function NoteEditorView() {
 
               <button
                 type="button"
-                onClick={() => setShowSidePanel(!showSidePanel)}
-                title="Toggle Graph Connections"
+                onClick={() => setShowSidePanel(true)}
+                title="Open Connections Drawer"
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
                   showSidePanel
                     ? 'border-primary bg-primary/10 text-primary'
@@ -167,11 +169,6 @@ export function NoteEditorView() {
                 <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.2 text-[10px] font-semibold text-foreground">
                   {totalConnections}
                 </span>
-                {showSidePanel ? (
-                  <PanelRightClose className="h-3.5 w-3.5 ml-0.5" />
-                ) : (
-                  <PanelRightOpen className="h-3.5 w-3.5 ml-0.5" />
-                )}
               </button>
             </div>
           </div>
@@ -219,35 +216,17 @@ export function NoteEditorView() {
         </div>
       </div>
 
-      {/* Side Panel for Quick Connections Navigation */}
-      {showSidePanel && (
-        <aside className="w-80 border-l border-border bg-card overflow-y-auto p-4 space-y-6 shrink-0 transition-all">
-          <div className="flex items-center justify-between pb-2 border-b border-border">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Share2 className="h-3.5 w-3.5 text-primary" />
-              <span>Connections Drawer</span>
-            </h4>
-            <button
-              type="button"
-              onClick={() => setShowSidePanel(false)}
-              className="p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <PanelRightClose className="h-4 w-4" />
-            </button>
-          </div>
-
-          <RelationshipsPanel
-            currentNoteId={note.id}
-            outgoing={outgoing}
-            onAddRelationship={addRelationship}
-            onDeleteRelationship={removeRelationship}
-          />
-
-          <BacklinksPanel
-            incoming={incoming}
-          />
-        </aside>
-      )}
+      {/* Unified Connections Drawer */}
+      <ConnectionsDrawer
+        isOpen={showSidePanel}
+        onClose={() => setShowSidePanel(false)}
+        itemId={note.id}
+        item={note}
+        onItemUpdated={() => {
+          refetchNote();
+          refetchRelationships();
+        }}
+      />
     </div>
   );
 }

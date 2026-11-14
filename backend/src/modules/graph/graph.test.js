@@ -94,8 +94,14 @@ jest.unstable_mockModule('../../config/database.js', () => {
         findMany: jest.fn().mockImplementation(({ where }) => {
           if (!where) return Promise.resolve(allNotes);
           let filtered = allNotes.filter((n) => n.archivedAt === null);
+          if (where.type) {
+            filtered = filtered.filter((n) => n.type === where.type);
+          }
           if (where.parentId !== undefined) {
             filtered = filtered.filter((n) => n.parentId === where.parentId);
+          }
+          if (where.id?.in) {
+            filtered = filtered.filter((n) => where.id.in.includes(n.id));
           }
           return Promise.resolve(filtered);
         }),
@@ -169,6 +175,20 @@ describe('Knowledge Graph API Endpoints (/api/v1/graph)', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.nodes.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('GET /api/v1/graph/folders (List All Folders)', () => {
+    it('returns list of all non-archived folders with hierarchy paths', async () => {
+      const res = await request(app).get('/api/v1/graph/folders');
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('folders');
+      expect(Array.isArray(res.body.data.folders)).toBe(true);
+      expect(res.body.data.folders.length).toBeGreaterThan(0);
+      expect(res.body.data.folders[0]).toHaveProperty('path');
+      expect(res.body.data.folders[0]).toHaveProperty('childCount');
     });
   });
 

@@ -268,6 +268,10 @@ export async function moveNote(noteId, newParentId) {
       throw new AppError(`Target parent note with ID ${newParentId} not found`, 404);
     }
 
+    if (existingNote.type === 'FOLDER' && targetParent.type === 'NOTE') {
+      throw new AppError('A folder cannot have a note as parent', 400);
+    }
+
     // Circular reference check
     await assertNoCycle(noteId, newParentId);
   }

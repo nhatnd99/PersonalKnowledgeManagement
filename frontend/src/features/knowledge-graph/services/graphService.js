@@ -6,6 +6,15 @@ import apiClient from '../../../services/apiClient.js';
  */
 export const graphService = {
   /**
+   * Fetch all folders with hierarchy paths and child counts for Folder Selector.
+   * @returns {Promise<{ folders: Array, total: number }>}
+   */
+  async getFoldersList() {
+    const response = await apiClient.get('/graph/folders');
+    return response.data.data;
+  },
+
+  /**
    * Fetch Root Workspace Graph nodes and edges.
    *
    * @param {Object} [options={}]

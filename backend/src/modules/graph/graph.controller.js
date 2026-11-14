@@ -6,6 +6,15 @@ import { sendSuccess } from '../../utils/apiResponse.js';
  */
 
 /**
+ * List all folders with their child counts and hierarchy paths.
+ * GET /api/v1/graph/folders
+ */
+export async function listFoldersHandler(req, res) {
+  const result = await graphService.listAllFolders();
+  return sendSuccess(res, result, 'Folders retrieved successfully');
+}
+
+/**
  * Get Root Graph (top-level folders and notes).
  * GET /api/v1/graph/root
  */

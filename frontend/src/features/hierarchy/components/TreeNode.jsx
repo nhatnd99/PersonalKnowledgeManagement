@@ -60,7 +60,7 @@ export function TreeNode({
       try {
         await onMoveNote(draggedNoteId, node.id);
       } catch (err) {
-        alert(err.message || 'Cannot move note here');
+        alert(err.response?.data?.message || err.message || 'Cannot move note here');
       }
     }
   };
@@ -159,17 +159,19 @@ export function TreeNode({
                 <FilePlus className="h-3.5 w-3.5" />
                 New Child Note
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMenu(false);
-                  onCreateChild(node.id, NOTE_TYPES.FOLDER);
-                }}
-                className="flex w-full items-center gap-1.5 rounded px-2 py-1 hover:bg-muted text-foreground"
-              >
-                <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
-                New Folder
-              </button>
+              {isFolder && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+                    onCreateChild(node.id, NOTE_TYPES.FOLDER);
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded px-2 py-1 hover:bg-muted text-foreground"
+                >
+                  <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
+                  New Subfolder
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {

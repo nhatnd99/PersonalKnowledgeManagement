@@ -8,6 +8,7 @@ import { FileText, Star, Network, ExternalLink } from 'lucide-react';
  * Features primary styling, tag indicators, external connection count, and quick actions.
  */
 export const NoteNode = memo(function NoteNode({ data, selected }) {
+  const isExternal = Boolean(data.isExternal);
   const externalCount = data.externalConnectionCount || 0;
 
   const handleOpenNote = (e) => {
@@ -28,7 +29,9 @@ export const NoteNode = memo(function NoteNode({ data, selected }) {
     <div
       onDoubleClick={handleOpenNote}
       className={`relative min-w-[170px] max-w-[230px] rounded-xl border bg-card p-3 shadow-md transition-all cursor-pointer ${
-        selected
+        isExternal
+          ? 'border-dashed border-muted-foreground/60 bg-muted/20 opacity-85 hover:opacity-100'
+          : selected
           ? 'border-primary ring-2 ring-primary/40 shadow-primary/10 shadow-lg'
           : 'border-border hover:border-primary/50 hover:shadow-md'
       }`}
@@ -47,10 +50,15 @@ export const NoteNode = memo(function NoteNode({ data, selected }) {
         </span>
 
         <div className="flex items-center gap-1">
+          {isExternal && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border border-border">
+              External
+            </span>
+          )}
           {data.isFavorite && (
             <Star className="h-3 w-3 fill-amber-500 text-amber-500 shrink-0" />
           )}
-          {externalCount > 0 && (
+          {externalCount > 0 && !isExternal && (
             <span
               title={`${externalCount} external knowledge connections`}
               className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"

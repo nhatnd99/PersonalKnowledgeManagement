@@ -61,26 +61,97 @@ async function getFolderAncestors(folderId) {
 }
 
 /**
+ * Recursively collects all descendant notes and folders under a parent.
+ *
+ * @param {string} parentId - Parent note/folder UUID
+ * @returns {Promise<Array>} List of all descendants at all depths
+ */
+async function getAllDescendantEntities(parentId) {
+  const directChildren = await prisma.note.findMany({
+    where: { parentId, archivedAt: null },
+    select: NOTE_SELECT_FIELDS,
+    orderBy: [{ type: 'desc' }, { title: 'asc' }],
+  });
+
+  const allDescendants = [...directChildren];
+  for (const child of directChildren) {
+    const subChildren = await getAllDescendantEntities(child.id);
+    allDescendants.push(...subChildren);
+  }
+  return allDescendants;
+}
+
+/**
+ * List all folders with their child counts and hierarchy paths.
+ *
+ * @returns {Promise<{ folders: Array, total: number }>}
+ */
+export async function listAllFolders() {
+  const folders = await prisma.note.findMany({
+    where: { type: 'FOLDER', archivedAt: null },
+    select: {
+      id: true,
+      title: true,
+      parentId: true,
+      updatedAt: true,
+    },
+    orderBy: { title: 'asc' },
+  });
+
+  const childCounts = await prisma.note.groupBy({
+    by: ['parentId'],
+    where: { archivedAt: null },
+    _count: { id: true },
+  });
+  const countMap = new Map(childCounts.map((c) => [c.parentId, c._count.id]));
+
+  const enrichedFolders = [];
+  for (const folder of folders) {
+    const ancestors = await getFolderAncestors(folder.id);
+    const path = ['Root', ...ancestors.map((a) => a.title), folder.title].join(' > ');
+
+    enrichedFolders.push({
+      id: folder.id,
+      title: folder.title,
+      parentId: folder.parentId,
+      childCount: countMap.get(folder.id) || 0,
+      path,
+      updatedAt: folder.updatedAt,
+    });
+  }
+
+  return { folders: enrichedFolders, total: enrichedFolders.length };
+}
+
+/**
  * Retrieve a folder-scoped graph (or Root Graph).
- * Only direct children (and the current folder node if scoped) are included.
+ * When a folder is specified, includes the Central Folder node and ALL its descendants at any depth.
  *
  * @param {Object} options
  * @param {string} [options.folderId='root'] - Folder UUID or 'root'
  * @param {string} [options.relationshipType] - Filter by specific relationship type
  * @param {boolean} [options.includeHierarchy=false] - Whether to generate hierarchy edges
+ * @param {boolean} [options.includeExternal=true] - Whether to include external endpoint nodes
  * @returns {Promise<{ scope: Object, nodes: Array, edges: Array, meta: Object }>}
  */
 export async function getFolderGraphData(options = {}) {
-  const { folderId = 'root', relationshipType, includeHierarchy = false } = options;
+  const {
+    folderId = 'root',
+    relationshipType,
+    includeHierarchy = false,
+    includeExternal = true,
+  } = options;
+
+  const shouldIncludeExternal = folderId !== 'root' && Boolean(includeExternal);
 
   let currentFolder = null;
   let breadcrumbs = [{ id: 'root', title: 'Root' }];
-  let directChildren = [];
+  let descendants = [];
   let scopeNodes = [];
 
   if (folderId === 'root' || !folderId) {
-    // 1. Root Workspace Graph
-    directChildren = await prisma.note.findMany({
+    // 1. Root Workspace Graph: top-level items
+    descendants = await prisma.note.findMany({
       where: {
         parentId: null,
         archivedAt: null,
@@ -89,9 +160,9 @@ export async function getFolderGraphData(options = {}) {
       orderBy: [{ type: 'desc' }, { title: 'asc' }],
     });
 
-    scopeNodes = directChildren;
+    scopeNodes = descendants;
   } else {
-    // 2. Folder-Scoped Graph
+    // 2. Folder-Centric Graph
     currentFolder = await prisma.note.findUnique({
       where: { id: folderId },
       select: NOTE_SELECT_FIELDS,
@@ -112,23 +183,16 @@ export async function getFolderGraphData(options = {}) {
       { id: currentFolder.id, title: currentFolder.title },
     ];
 
-    directChildren = await prisma.note.findMany({
-      where: {
-        parentId: folderId,
-        archivedAt: null,
-      },
-      select: NOTE_SELECT_FIELDS,
-      orderBy: [{ type: 'desc' }, { title: 'asc' }],
-    });
+    // Recursively collect all descendants at any level
+    descendants = await getAllDescendantEntities(folderId);
 
-    // Scope contains the container folder itself plus its direct children
-    scopeNodes = [currentFolder, ...directChildren];
+    // Scope contains the container folder itself (Central Node) plus all descendants
+    scopeNodes = [currentFolder, ...descendants];
   }
 
   const scopeNodeIds = new Set(scopeNodes.map((n) => n.id));
 
   // 3. Query all relationships connected to any node in scope
-  // This allows finding both within-scope edges and calculating external connection counts
   const allConnectedRelationships = await prisma.noteRelationship.findMany({
     where: {
       OR: [
@@ -164,6 +228,9 @@ export async function getFolderGraphData(options = {}) {
 
   // 5. Partition relationships into internal scope edges vs external connections
   const internalEdges = [];
+  const externalEdges = [];
+  const externalNodeIds = new Set();
+
   for (const rel of allConnectedRelationships) {
     const sourceInScope = scopeNodeIds.has(rel.sourceNoteId);
     const targetInScope = scopeNodeIds.has(rel.targetNoteId);
@@ -176,35 +243,95 @@ export async function getFolderGraphData(options = {}) {
         relationshipType: rel.relationshipType,
         description: rel.description,
         isHierarchy: false,
+        isExternal: false,
       });
     } else {
       if (sourceInScope) {
         externalCountMap.set(rel.sourceNoteId, (externalCountMap.get(rel.sourceNoteId) || 0) + 1);
+        externalNodeIds.add(rel.targetNoteId);
+        if (shouldIncludeExternal) {
+          externalEdges.push({
+            id: rel.id,
+            source: rel.sourceNoteId,
+            target: rel.targetNoteId,
+            relationshipType: rel.relationshipType,
+            description: rel.description,
+            isHierarchy: false,
+            isExternal: true,
+          });
+        }
       }
       if (targetInScope) {
         externalCountMap.set(rel.targetNoteId, (externalCountMap.get(rel.targetNoteId) || 0) + 1);
+        externalNodeIds.add(rel.sourceNoteId);
+        if (shouldIncludeExternal) {
+          externalEdges.push({
+            id: rel.id,
+            source: rel.sourceNoteId,
+            target: rel.targetNoteId,
+            relationshipType: rel.relationshipType,
+            description: rel.description,
+            isHierarchy: false,
+            isExternal: true,
+          });
+        }
       }
     }
   }
 
-  // 6. Add hierarchy edges if requested
+  // 6. Fetch external nodes if requested and present
+  let externalNodes = [];
+  if (shouldIncludeExternal && externalNodeIds.size > 0) {
+    const externalRecords = await prisma.note.findMany({
+      where: {
+        id: { in: Array.from(externalNodeIds) },
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        parentId: true,
+        updatedAt: true,
+      },
+    });
+
+    externalNodes = externalRecords.map((node) => ({
+      id: node.id,
+      title: node.title,
+      type: node.type,
+      parentId: node.parentId,
+      isFavorite: false,
+      isScopeFolder: false,
+      isCentralNode: false,
+      isExternal: true,
+      childCount: 0,
+      externalConnectionCount: 0,
+      tags: [],
+    }));
+  }
+
+  // 7. Add hierarchy edges if requested
   const hierarchyEdges = [];
   if (includeHierarchy && currentFolder) {
-    for (const child of directChildren) {
-      hierarchyEdges.push({
-        id: `hierarchy-${currentFolder.id}-${child.id}`,
-        source: currentFolder.id,
-        target: child.id,
-        relationshipType: 'PARENT_OF',
-        isHierarchy: true,
-      });
+    for (const node of descendants) {
+      if (node.parentId && scopeNodeIds.has(node.parentId)) {
+        hierarchyEdges.push({
+          id: `hierarchy-${node.parentId}-${node.id}`,
+          source: node.parentId,
+          target: node.id,
+          relationshipType: 'PARENT_OF',
+          isHierarchy: true,
+          isExternal: false,
+        });
+      }
     }
   }
 
-  const allEdges = [...internalEdges, ...hierarchyEdges];
+  const allEdges = [...internalEdges, ...hierarchyEdges, ...externalEdges];
 
-  // 7. Format nodes with metadata
-  const formattedNodes = scopeNodes.map((node) => {
+  // 8. Format nodes with metadata
+  const formattedScopeNodes = scopeNodes.map((node) => {
     const isCurrentScopeFolder = currentFolder && node.id === currentFolder.id;
     return {
       id: node.id,
@@ -214,14 +341,17 @@ export async function getFolderGraphData(options = {}) {
       isFavorite: node.isFavorite,
       updatedAt: node.updatedAt,
       isScopeFolder: isCurrentScopeFolder,
+      isCentralNode: isCurrentScopeFolder,
+      isExternal: false,
       childCount: node.type === 'FOLDER' ? childCountMap.get(node.id) || 0 : 0,
       externalConnectionCount: externalCountMap.get(node.id) || 0,
       tags: (node.tags || []).map((nt) => nt.tag),
     };
   });
 
-  const folderCount = formattedNodes.filter((n) => n.type === 'FOLDER').length;
-  const noteCount = formattedNodes.filter((n) => n.type === 'NOTE').length;
+  const allNodes = [...formattedScopeNodes, ...externalNodes];
+  const folderCount = formattedScopeNodes.filter((n) => n.type === 'FOLDER').length;
+  const noteCount = formattedScopeNodes.filter((n) => n.type === 'NOTE').length;
 
   return {
     scope: {
@@ -230,13 +360,16 @@ export async function getFolderGraphData(options = {}) {
       type: currentFolder ? 'FOLDER' : 'ROOT',
       breadcrumbs,
     },
-    nodes: formattedNodes,
+    nodes: allNodes,
     edges: allEdges,
     meta: {
-      totalNodes: formattedNodes.length,
+      totalNodes: allNodes.length,
+      scopeNodesCount: formattedScopeNodes.length,
+      externalNodesCount: externalNodes.length,
       totalEdges: allEdges.length,
       internalEdgesCount: internalEdges.length,
       hierarchyEdgesCount: hierarchyEdges.length,
+      externalEdgesCount: externalEdges.length,
       folderCount,
       noteCount,
     },

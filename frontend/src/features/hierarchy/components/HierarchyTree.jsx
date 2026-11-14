@@ -60,7 +60,7 @@ export function HierarchyTree() {
       try {
         await moveNoteToParent(draggedNoteId, null);
       } catch (err) {
-        alert(err.message || 'Cannot move note to root');
+        alert(err.response?.data?.message || err.message || 'Cannot move note to root');
       }
     }
   };

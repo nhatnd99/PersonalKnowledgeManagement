@@ -9,6 +9,12 @@ const router = Router();
  * Knowledge Graph routes mounted at /api/v1/graph
  */
 
+// List all folders for Folder Selector
+router.get(
+  '/folders',
+  graphController.listFoldersHandler
+);
+
 // Root Workspace Graph
 router.get(
   '/root',

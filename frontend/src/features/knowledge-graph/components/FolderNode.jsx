@@ -8,7 +8,8 @@ import { Folder, FolderOpen, ArrowRight, Network } from 'lucide-react';
  * Features amber styling, child counts, external connection badges, and drill-down navigation.
  */
 export const FolderNode = memo(function FolderNode({ data, selected }) {
-  const isScopeFolder = Boolean(data.isScopeFolder);
+  const isScopeFolder = Boolean(data.isScopeFolder || data.isCentralNode);
+  const isExternal = Boolean(data.isExternal);
   const childCount = data.childCount || 0;
   const externalCount = data.externalConnectionCount || 0;
 
@@ -29,9 +30,11 @@ export const FolderNode = memo(function FolderNode({ data, selected }) {
   return (
     <div
       onDoubleClick={handleOpenGraph}
-      className={`relative min-w-[180px] max-w-[240px] rounded-xl border bg-card p-3 shadow-md transition-all cursor-pointer ${
+      className={`relative min-w-[190px] max-w-[250px] rounded-xl border bg-card p-3 shadow-md transition-all cursor-pointer ${
         isScopeFolder
-          ? 'border-amber-500 ring-2 ring-amber-500/40 bg-amber-500/5 shadow-amber-500/10'
+          ? 'border-amber-500 ring-4 ring-amber-500/40 bg-amber-500/15 shadow-xl shadow-amber-500/10 scale-105 z-20'
+          : isExternal
+          ? 'border-dashed border-muted-foreground/60 bg-muted/20 opacity-85 hover:opacity-100'
           : selected
           ? 'border-amber-500 ring-2 ring-amber-500/30 shadow-lg'
           : 'border-amber-500/40 hover:border-amber-500 hover:shadow-lg'
@@ -49,7 +52,7 @@ export const FolderNode = memo(function FolderNode({ data, selected }) {
           {isScopeFolder ? (
             <>
               <FolderOpen className="h-3 w-3" />
-              <span>Current Folder</span>
+              <span>Central Folder</span>
             </>
           ) : (
             <>
@@ -59,15 +62,22 @@ export const FolderNode = memo(function FolderNode({ data, selected }) {
           )}
         </span>
 
-        {externalCount > 0 && (
-          <span
-            title={`${externalCount} external knowledge connections`}
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
-          >
-            <Network className="h-2.5 w-2.5" />
-            <span>{externalCount}</span>
-          </span>
-        )}
+        <div className="flex items-center gap-1">
+          {isExternal && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-muted text-muted-foreground border border-border">
+              External
+            </span>
+          )}
+          {externalCount > 0 && !isExternal && (
+            <span
+              title={`${externalCount} external knowledge connections`}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+            >
+              <Network className="h-2.5 w-2.5" />
+              <span>{externalCount}</span>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Folder Title */}

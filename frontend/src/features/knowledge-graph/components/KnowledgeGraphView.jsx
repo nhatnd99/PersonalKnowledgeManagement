@@ -16,9 +16,11 @@ import { graphService } from '../services/graphService.js';
 import * as noteService from '../../notes/services/noteService.js';
 import { NoteNode } from './NoteNode.jsx';
 import { FolderNode } from './FolderNode.jsx';
+import { FolderSelector } from './FolderSelector.jsx';
 import { GraphToolbar } from './GraphToolbar.jsx';
 import { GraphNodeDrawer } from './GraphNodeDrawer.jsx';
 import { GraphConnectModal } from './GraphConnectModal.jsx';
+import { ConnectionsDrawer } from '../../connections/components/ConnectionsDrawer.jsx';
 import { Sparkles, FolderPlus, FilePlus } from 'lucide-react';
 import { NOTE_TYPES } from '../../../constants/index.js';
 
@@ -61,6 +63,7 @@ function layoutScopedNodes(rawNodes, handlers) {
       position: { x: centerX, y: centerY },
       data: {
         ...scopeFolderNode,
+        isCentralNode: true,
         ...handlers,
       },
     });
@@ -137,8 +140,10 @@ function KnowledgeGraphCanvas() {
   const [scopeData, setScopeData] = useState(null);
   const [rawNodesList, setRawNodesList] = useState([]);
   const [relationshipType, setRelationshipType] = useState('');
-  const [includeHierarchy, setIncludeHierarchy] = useState(false);
+  const [includeHierarchy, setIncludeHierarchy] = useState(true);
   const [selectedNode, setSelectedNode] = useState(null);
+  const [drawerNode, setDrawerNode] = useState(null);
+  const [foldersList, setFoldersList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -146,9 +151,20 @@ function KnowledgeGraphCanvas() {
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [connectSourceNode, setConnectSourceNode] = useState(null);
 
+  // Load available folders for quick switching
+  useEffect(() => {
+    graphService
+      .getFoldersList()
+      .then((res) => {
+        setFoldersList(res.folders || []);
+      })
+      .catch(() => {});
+  }, []);
+
   const handleOpenFolderGraph = useCallback(
     (targetFolderId) => {
       setSelectedNode(null);
+      setDrawerNode(null);
       if (targetFolderId === 'root') {
         navigate('/graph/root');
       } else {
@@ -170,13 +186,17 @@ function KnowledgeGraphCanvas() {
     setIsConnectModalOpen(true);
   }, []);
 
+  const handleOpenDrawer = useCallback((node) => {
+    setDrawerNode(node);
+  }, []);
+
   const nodeHandlers = useMemo(
     () => ({
       onOpenFolderGraph: handleOpenFolderGraph,
       onOpenNote: handleOpenNote,
-      onConnectNode: handleOpenConnectModal,
+      onConnectNode: handleOpenDrawer,
     }),
-    [handleOpenFolderGraph, handleOpenNote, handleOpenConnectModal]
+    [handleOpenFolderGraph, handleOpenNote, handleOpenDrawer]
   );
 
   const fetchGraphData = useCallback(async () => {
@@ -266,6 +286,8 @@ function KnowledgeGraphCanvas() {
         onRefresh={fetchGraphData}
         onFitView={handleFitView}
         onOpenConnectModal={() => handleOpenConnectModal(null)}
+        foldersList={foldersList}
+        onBackToFolderSelection={() => navigate('/graph')}
       />
 
       {error && (
@@ -337,7 +359,7 @@ function KnowledgeGraphCanvas() {
         onClose={() => setSelectedNode(null)}
         onOpenNote={handleOpenNote}
         onOpenFolderGraph={handleOpenFolderGraph}
-        onConnectNode={(node) => handleOpenConnectModal(node)}
+        onConnectNode={(node) => setDrawerNode(node)}
       />
 
       {/* Connect Modal */}
@@ -348,6 +370,17 @@ function KnowledgeGraphCanvas() {
         availableNodes={rawNodesList}
         onSuccess={fetchGraphData}
       />
+
+      {/* Full Connections Drawer (Hierarchy + Semantic) */}
+      {drawerNode && (
+        <ConnectionsDrawer
+          isOpen={Boolean(drawerNode)}
+          onClose={() => setDrawerNode(null)}
+          itemId={drawerNode.id}
+          item={drawerNode}
+          onItemUpdated={fetchGraphData}
+        />
+      )}
     </div>
   );
 }
@@ -356,6 +389,24 @@ function KnowledgeGraphCanvas() {
  * KnowledgeGraphView with ReactFlowProvider wrapper.
  */
 export function KnowledgeGraphView() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // If at /graph without a specific folder, show the Folder Selection screen
+  if (location.pathname === '/graph') {
+    return (
+      <FolderSelector
+        onSelectFolder={(id) => {
+          if (id === 'root') {
+            navigate('/graph/root');
+          } else {
+            navigate(`/graph/folders/${id}`);
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <ReactFlowProvider>
       <KnowledgeGraphCanvas />
