@@ -44,15 +44,15 @@ export function GraphToolbar({
   const isRoot = !scope || scope.id === 'root';
 
   return (
-    <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-10 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pointer-events-none">
       {/* Left side: Breadcrumb & Scope title & Switcher */}
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-card/95 px-3 py-2 shadow-lg backdrop-blur-md pointer-events-auto">
+      <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-border bg-card/95 px-2 sm:px-3 py-1.5 sm:py-2 shadow-lg backdrop-blur-md pointer-events-auto">
         {onBackToFolderSelection && (
           <button
             type="button"
             onClick={onBackToFolderSelection}
             title="Back to Folder Selection"
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mr-1 text-xs font-medium"
+            className="flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mr-0.5 sm:mr-1 text-xs font-medium"
           >
             <FolderTree className="h-3.5 w-3.5 text-primary" />
             <span className="hidden sm:inline">Folders</span>
@@ -71,7 +71,7 @@ export function GraphToolbar({
               }
             }}
             title="Go to parent folder graph"
-            className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mr-1"
+            className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mr-0.5 sm:mr-1"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -82,7 +82,7 @@ export function GraphToolbar({
           <select
             value={scope?.id || 'root'}
             onChange={(e) => onNavigateBreadcrumb(e.target.value)}
-            className="rounded-md border border-input bg-background/80 px-2 py-0.5 text-xs text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-ring max-w-[150px] truncate"
+            className="rounded-md border border-input bg-background/80 px-1.5 sm:px-2 py-0.5 text-xs text-foreground font-medium focus:outline-none focus:ring-1 focus:ring-ring max-w-[110px] sm:max-w-[150px] truncate"
             title="Switch Folder Graph"
           >
             <option value="root">📂 Root Workspace</option>
@@ -132,20 +132,20 @@ export function GraphToolbar({
         </nav>
 
         {/* Stats */}
-        <div className="ml-2 pl-2 border-l border-border text-[11px] text-muted-foreground">
+        <div className="ml-1 sm:ml-2 pl-1.5 sm:pl-2 border-l border-border text-[10px] sm:text-[11px] text-muted-foreground">
           <span>{nodeCount} {nodeCount === 1 ? 'node' : 'nodes'}, {edgeCount} {edgeCount === 1 ? 'edge' : 'edges'}</span>
         </div>
       </div>
 
       {/* Right side: Controls & Tools */}
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-card/95 p-1.5 shadow-lg backdrop-blur-md text-xs pointer-events-auto">
+      <div className="flex items-center gap-1 sm:gap-2 rounded-xl border border-border bg-card/95 p-1 sm:p-1.5 shadow-lg backdrop-blur-md text-xs pointer-events-auto">
         {/* Relationship Type Filter */}
         <div className="flex items-center gap-1 px-1">
-          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <select
             value={relationshipType}
             onChange={(e) => onRelationshipTypeChange(e.target.value)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="rounded-md border border-input bg-background px-1.5 sm:px-2 py-1 text-[11px] sm:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring max-w-[90px] sm:max-w-none truncate"
           >
             {RELATIONSHIP_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -160,14 +160,14 @@ export function GraphToolbar({
           type="button"
           onClick={onToggleHierarchy}
           title="Toggle direct parent-to-child hierarchy links"
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs transition-colors ${
+          className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md border text-xs transition-colors ${
             includeHierarchy
               ? 'bg-primary/10 border-primary text-primary font-medium'
               : 'bg-background border-border text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
           <Layers className="h-3.5 w-3.5" />
-          <span>Hierarchy Links</span>
+          <span className="hidden sm:inline">Hierarchy Links</span>
         </button>
 
         {/* Connect Nodes Button */}
@@ -175,10 +175,10 @@ export function GraphToolbar({
           <button
             type="button"
             onClick={onOpenConnectModal}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Connect</span>
+            <span className="hidden sm:inline">Connect</span>
           </button>
         )}
 
@@ -188,7 +188,7 @@ export function GraphToolbar({
             type="button"
             onClick={onFitView}
             title="Fit graph view"
-            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 sm:p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             <Maximize2 className="h-3.5 w-3.5" />
           </button>
@@ -200,7 +200,7 @@ export function GraphToolbar({
             type="button"
             onClick={onRefresh}
             title="Refresh graph data"
-            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 sm:p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             <RotateCw className="h-3.5 w-3.5" />
           </button>

@@ -119,11 +119,11 @@ export function SearchView() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
       {/* Header */}
-      <div className="pb-4 mb-6 border-b border-border">
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Search className="h-6 w-6 text-primary" />
+      <div className="pb-4 mb-4 sm:mb-6 border-b border-border">
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+          <Search className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           <span>Knowledge Discovery</span>
         </h1>
         <p className="text-xs text-muted-foreground mt-1">
@@ -153,8 +153,8 @@ export function SearchView() {
       </div>
 
       {/* Filter Chips Bar */}
-      <div className="flex flex-wrap items-center gap-2 mb-6 text-xs">
-        <div className="flex items-center gap-1 text-muted-foreground font-medium mr-1">
+      <div className="flex items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6 text-xs overflow-x-auto scrollbar-none touch-pan-x pb-1 shrink-0">
+        <div className="flex items-center gap-1 text-muted-foreground font-medium mr-1 shrink-0">
           <Filter className="h-3.5 w-3.5" />
           <span>Filters:</span>
         </div>
@@ -163,7 +163,7 @@ export function SearchView() {
         <button
           type="button"
           onClick={() => handleTypeSelect('')}
-          className={`px-2.5 py-1 rounded-full border transition-colors ${
+          className={`px-2.5 py-1 rounded-full border transition-colors shrink-0 ${
             !selectedType
               ? 'bg-primary text-primary-foreground border-primary font-medium'
               : 'bg-card text-muted-foreground border-border hover:bg-muted'
@@ -174,7 +174,7 @@ export function SearchView() {
         <button
           type="button"
           onClick={() => handleTypeSelect('NOTE')}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${
+          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors shrink-0 ${
             selectedType === 'NOTE'
               ? 'bg-primary text-primary-foreground border-primary font-medium'
               : 'bg-card text-muted-foreground border-border hover:bg-muted'
@@ -186,7 +186,7 @@ export function SearchView() {
         <button
           type="button"
           onClick={() => handleTypeSelect('FOLDER')}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${
+          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors shrink-0 ${
             selectedType === 'FOLDER'
               ? 'bg-primary text-primary-foreground border-primary font-medium'
               : 'bg-card text-muted-foreground border-border hover:bg-muted'
@@ -200,7 +200,7 @@ export function SearchView() {
         <button
           type="button"
           onClick={handleFavoriteToggle}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${
+          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors shrink-0 ${
             isFavoriteOnly
               ? 'bg-amber-500 text-amber-950 border-amber-500 font-medium'
               : 'bg-card text-muted-foreground border-border hover:bg-muted'
@@ -213,8 +213,8 @@ export function SearchView() {
 
       {/* Available Tag Pills */}
       {availableTags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 mb-6 pb-4 border-b border-border/60">
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mr-1">
+        <div className="flex items-center gap-1.5 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border/60 overflow-x-auto scrollbar-none touch-pan-x">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mr-1 shrink-0">
             Tags:
           </span>
           {availableTags.map((tag) => {
@@ -224,7 +224,7 @@ export function SearchView() {
                 key={tag.id}
                 type="button"
                 onClick={() => handleTagToggle(tag.name)}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors border ${
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors border shrink-0 ${
                   isSelected
                     ? 'bg-primary text-primary-foreground border-primary font-medium'
                     : 'bg-card text-foreground border-border hover:bg-muted'

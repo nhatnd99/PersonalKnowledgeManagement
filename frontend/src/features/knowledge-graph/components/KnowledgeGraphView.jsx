@@ -280,10 +280,10 @@ function KnowledgeGraphCanvas() {
         className="bg-muted/10"
       >
         <Background gap={18} size={1} color="currentColor" className="opacity-10 text-foreground" />
-        <Controls className="!bg-card !border-border !shadow-lg !rounded-xl overflow-hidden" />
+        <Controls className="!bg-card !border-border !shadow-lg !rounded-xl overflow-hidden mb-2 sm:mb-0" />
         <MiniMap
           nodeColor={(n) => (n.data?.type === 'FOLDER' ? '#f59e0b' : '#3b82f6')}
-          className="!bg-card/90 !border-border !rounded-xl !shadow-lg backdrop-blur-md"
+          className="!hidden sm:!block !bg-card/90 !border-border !rounded-xl !shadow-lg backdrop-blur-md"
         />
       </ReactFlow>
 

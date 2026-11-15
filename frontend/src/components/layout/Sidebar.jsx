@@ -27,7 +27,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 border-r border-border bg-card flex flex-col h-[calc(100vh-3.5rem)] select-none">
+    <aside className="hidden md:flex w-60 lg:w-64 border-r border-border bg-card flex-col h-[calc(100vh-3.5rem)] select-none shrink-0">
       {/* Action buttons */}
       <div className="p-3 border-b border-border space-y-2">
         <div className="flex gap-1.5">

@@ -70,8 +70,8 @@ export function AddRelationshipModal({ isOpen, onClose, currentNoteId, onAdd }) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-3 sm:p-4">
+      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-xl max-h-[90vh] flex flex-col overflow-y-auto">
         <div className="flex items-center justify-between pb-4 border-b border-border mb-4">
           <div className="flex items-center gap-2">
             <Plus className="h-5 w-5 text-primary" />

@@ -11,8 +11,9 @@ import { BacklinksPanel } from '../../backlinks/components/BacklinksPanel.jsx';
 import { ConnectionsDrawer } from '../../connections/components/ConnectionsDrawer.jsx';
 import { NoteTagsSelector } from '../../tags/components/NoteTagsSelector.jsx';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal.jsx';
+import { MobileNotesList } from '../components/MobileNotesList.jsx';
 import { exportNote } from '../services/noteService.js';
-import { Star, FileText, Share2, Download, Trash2 } from 'lucide-react';
+import { Star, FileText, Share2, Download, Trash2, ArrowLeft } from 'lucide-react';
 
 /**
  * NoteEditorView: Workspace page displaying note header, editable title,
@@ -122,6 +123,10 @@ export function NoteEditorView() {
     }
   };
 
+  if (!noteId) {
+    return <MobileNotesList />;
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
@@ -132,8 +137,16 @@ export function NoteEditorView() {
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center p-8 text-sm text-destructive">
-        {error}
+      <div className="flex h-full flex-col items-center justify-center p-8 text-center text-sm text-destructive gap-3">
+        <span>{error}</span>
+        <button
+          type="button"
+          onClick={() => navigate('/notes')}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-foreground text-xs hover:bg-muted"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Back to Notes</span>
+        </button>
       </div>
     );
   }
@@ -142,10 +155,18 @@ export function NoteEditorView() {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8 text-center text-muted-foreground">
         <FileText className="h-10 w-10 stroke-[1.5] mb-2 text-muted-foreground/50" />
-        <h2 className="text-lg font-semibold text-foreground">No Note Selected</h2>
-        <p className="text-xs text-muted-foreground max-w-sm mt-1">
-          Select an existing note from the sidebar or click &quot;New Note&quot; to create one.
+        <h2 className="text-lg font-semibold text-foreground">Note Not Found</h2>
+        <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
+          This note may have been deleted, moved, or the link is invalid.
         </p>
+        <button
+          type="button"
+          onClick={() => navigate('/notes')}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Back to Notes</span>
+        </button>
       </div>
     );
   }
@@ -155,13 +176,26 @@ export function NoteEditorView() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Main Note Canvas */}
-      <div className="flex-1 overflow-y-auto px-6 py-8">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-8">
         <div className="max-w-4xl mx-auto">
           {/* Top note metadata bar & Breadcrumbs */}
-          <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
-            <Breadcrumbs note={note} />
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-border">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={() => navigate('/notes')}
+                className="md:hidden inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+                aria-label="Back to notes list"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Notes</span>
+              </button>
+              <div className="truncate">
+                <Breadcrumbs note={note} />
+              </div>
+            </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <AutoSaveIndicator
                 status={status}
                 lastSavedAt={lastSavedAt}
@@ -172,7 +206,7 @@ export function NoteEditorView() {
                 type="button"
                 onClick={handleToggleFavorite}
                 aria-label="Toggle Favorite"
-                className={`p-1.5 rounded hover:bg-muted transition-colors ${
+                className={`p-1.5 rounded-md hover:bg-muted transition-colors ${
                   note.isFavorite ? 'text-amber-500' : 'text-muted-foreground'
                 }`}
               >
@@ -187,7 +221,7 @@ export function NoteEditorView() {
                 className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border border-border bg-background hover:bg-muted text-muted-foreground transition-colors"
               >
                 <Download className="h-3 w-3" />
-                <span>Export MD</span>
+                <span className="hidden sm:inline">Export</span>
               </button>
 
               {/* Delete Button */}
@@ -196,24 +230,24 @@ export function NoteEditorView() {
                 onClick={() => setIsDeleteModalOpen(true)}
                 title="Delete note"
                 aria-label="Delete note"
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border border-destructive/20 hover:border-destructive/40 bg-background hover:bg-destructive/10 text-destructive transition-colors"
+                className="inline-flex items-center gap-1 p-1.5 sm:px-2 sm:py-1 text-xs font-medium rounded-md border border-destructive/20 hover:border-destructive/40 bg-background hover:bg-destructive/10 text-destructive transition-colors"
               >
-                <Trash2 className="h-3 w-3" />
-                <span>Delete</span>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Delete</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowSidePanel(true)}
                 title="Open Connections Drawer"
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md border transition-colors ${
                   showSidePanel
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border bg-background hover:bg-muted text-muted-foreground'
                 }`}
               >
                 <Share2 className="h-3.5 w-3.5" />
-                <span>Connections</span>
+                <span className="hidden sm:inline">Connections</span>
                 <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.2 text-[10px] font-semibold text-foreground">
                   {totalConnections}
                 </span>
@@ -227,7 +261,7 @@ export function NoteEditorView() {
             value={title}
             onChange={handleTitleChange}
             placeholder="Untitled Note"
-            className="w-full text-3xl font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 mb-3"
+            className="w-full text-2xl sm:text-3xl font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 mb-3"
           />
 
           {/* Interactive Tag Chips Bar */}

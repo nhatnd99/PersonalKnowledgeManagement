@@ -121,12 +121,12 @@ export function TagsView() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
       {/* Header */}
-      <div className="flex items-center justify-between pb-6 mb-6 border-b border-border">
+      <div className="flex items-center justify-between pb-4 sm:pb-6 mb-4 sm:mb-6 border-b border-border">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Tag className="h-6 w-6 text-primary" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Tag className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             <span>Tags & Taxonomy</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -137,7 +137,7 @@ export function TagsView() {
         <button
           type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm shrink-0"
         >
           <Plus className="h-4 w-4" />
           <span>New Tag</span>
@@ -170,7 +170,7 @@ export function TagsView() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {tags.map((tag) => (
             <div
               key={tag.id}
@@ -238,8 +238,8 @@ export function TagsView() {
 
       {/* Modal for Create or Edit Tag */}
       {(isCreateOpen || editingTag) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-3 sm:p-4">
+          <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-xl max-h-[90vh] flex flex-col overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-border mb-4">
               <h3 className="font-semibold text-foreground flex items-center gap-2">
                 <Tag className="h-4 w-4 text-primary" />

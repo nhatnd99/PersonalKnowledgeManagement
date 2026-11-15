@@ -77,8 +77,8 @@ export function DeleteConfirmModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in-50 duration-150">
-      <div className="relative w-full max-w-md rounded-2xl border border-destructive/30 bg-card p-6 shadow-2xl text-xs space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in-50 duration-150">
+      <div className="relative w-full max-w-md rounded-2xl border border-destructive/30 bg-card p-4 sm:p-6 shadow-2xl text-xs space-y-4 max-h-[90vh] flex flex-col overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between pb-3 border-b border-border">
           <div className="flex items-center gap-2.5">

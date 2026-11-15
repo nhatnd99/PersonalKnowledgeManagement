@@ -37,7 +37,7 @@ export function EditorToolbar({
   if (!editor) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/30 px-3 py-1.5 text-xs select-none">
+    <div className="flex overflow-x-auto whitespace-nowrap scrollbar-none sm:flex-wrap items-center gap-1 border-b border-border bg-muted/30 px-2 sm:px-3 py-1.5 text-xs select-none touch-pan-x">
       {/* Group 1: Undo & Redo */}
       <div className="flex items-center gap-0.5">
         <button

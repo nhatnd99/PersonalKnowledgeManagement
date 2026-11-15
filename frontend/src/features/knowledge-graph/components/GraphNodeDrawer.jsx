@@ -40,7 +40,7 @@ export function GraphNodeDrawer({
   return (
     <aside
       aria-label="Node Details"
-      className="absolute right-4 top-20 bottom-4 z-20 w-84 max-w-sm rounded-2xl border border-border bg-card/95 p-5 shadow-2xl backdrop-blur-md flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200"
+      className="fixed sm:absolute inset-x-2 sm:inset-x-auto sm:right-4 bottom-2 sm:bottom-4 top-auto sm:top-20 z-30 sm:z-20 w-auto sm:w-84 max-h-[75vh] sm:max-h-none rounded-2xl border border-border bg-card/95 p-4 sm:p-5 shadow-2xl backdrop-blur-md flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:slide-in-from-right-4 duration-200"
     >
       {/* Header */}
       <div className="flex items-start justify-between pb-3 border-b border-border mb-4">

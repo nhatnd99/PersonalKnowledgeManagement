@@ -12,6 +12,7 @@ import {
   FolderPlus,
   FilePlus,
   Network,
+  FolderInput,
 } from 'lucide-react';
 import { NOTE_TYPES } from '../../../constants/index.js';
 
@@ -26,6 +27,7 @@ export function TreeNode({
   onMoveNote,
   onCreateChild,
   onDeleteNote,
+  onOpenMoveModal,
 }) {
   const navigate = useNavigate();
   const isExpanded = expandedNodeIds.has(node.id);
@@ -82,15 +84,16 @@ export function TreeNode({
         <button
           type="button"
           onClick={() => onToggleExpand(node.id)}
-          className={`flex h-4 w-4 items-center justify-center rounded hover:bg-muted text-muted-foreground ${
+          className={`flex h-6 w-6 sm:h-5 sm:w-5 items-center justify-center rounded hover:bg-muted text-muted-foreground ${
             !hasChildren && !isFolder ? 'opacity-0 cursor-default' : ''
           }`}
           disabled={!hasChildren && !isFolder}
+          aria-label={isExpanded ? 'Collapse' : 'Expand'}
         >
           {isExpanded ? (
-            <ChevronDown className="h-3 w-3" />
+            <ChevronDown className="h-3.5 w-3.5" />
           ) : (
-            <ChevronRight className="h-3 w-3" />
+            <ChevronRight className="h-3.5 w-3.5" />
           )}
         </button>
 
@@ -98,7 +101,7 @@ export function TreeNode({
         <NavLink
           to={`/notes/${node.id}`}
           className={({ isActive }) =>
-            `flex flex-1 items-center gap-1.5 min-w-0 ${
+            `flex flex-1 items-center gap-1.5 min-w-0 py-1 ${
               isActive ? 'text-primary font-semibold' : 'text-foreground/90'
             }`
           }
@@ -118,21 +121,21 @@ export function TreeNode({
           )}
         </NavLink>
 
-        {/* Hover action menu trigger */}
+        {/* Action menu trigger */}
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowMenu((prev) => !prev)}
             aria-label="Node actions"
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-opacity"
+            className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 sm:p-0.5 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-opacity"
           >
-            <MoreVertical className="h-3 w-3" />
+            <MoreVertical className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
           </button>
 
           {/* Context popover */}
           {showMenu && (
             <div
-              className="absolute right-0 top-6 z-50 w-36 rounded-md border border-border bg-card p-1 shadow-lg text-xs"
+              className="absolute right-0 top-6 z-50 w-40 rounded-md border border-border bg-card p-1 shadow-lg text-xs"
               onMouseLeave={() => setShowMenu(false)}
             >
               {isFolder && (
@@ -142,10 +145,23 @@ export function TreeNode({
                     setShowMenu(false);
                     navigate(`/graph/folders/${node.id}`);
                   }}
-                  className="flex w-full items-center gap-1.5 rounded px-2 py-1 hover:bg-muted text-foreground"
+                  className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 hover:bg-muted text-foreground"
                 >
                   <Network className="h-3.5 w-3.5 text-primary" />
                   Open Graph
+                </button>
+              )}
+              {onOpenMoveModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+                    onOpenMoveModal(node);
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 hover:bg-muted text-foreground"
+                >
+                  <FolderInput className="h-3.5 w-3.5 text-blue-500" />
+                  Move To...
                 </button>
               )}
               <button
@@ -154,7 +170,7 @@ export function TreeNode({
                   setShowMenu(false);
                   onCreateChild(node.id, NOTE_TYPES.NOTE);
                 }}
-                className="flex w-full items-center gap-1.5 rounded px-2 py-1 hover:bg-muted text-foreground"
+                className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 hover:bg-muted text-foreground"
               >
                 <FilePlus className="h-3.5 w-3.5" />
                 New Child Note
@@ -166,7 +182,7 @@ export function TreeNode({
                     setShowMenu(false);
                     onCreateChild(node.id, NOTE_TYPES.FOLDER);
                   }}
-                  className="flex w-full items-center gap-1.5 rounded px-2 py-1 hover:bg-muted text-foreground"
+                  className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 hover:bg-muted text-foreground"
                 >
                   <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
                   New Subfolder
@@ -178,7 +194,7 @@ export function TreeNode({
                   setShowMenu(false);
                   onDeleteNote(node);
                 }}
-                className="flex w-full items-center gap-1.5 rounded px-2 py-1 hover:bg-destructive/10 text-destructive"
+                className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 hover:bg-destructive/10 text-destructive"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete
@@ -201,6 +217,7 @@ export function TreeNode({
               onMoveNote={onMoveNote}
               onCreateChild={onCreateChild}
               onDeleteNote={onDeleteNote}
+              onOpenMoveModal={onOpenMoveModal}
             />
           ))}
         </div>

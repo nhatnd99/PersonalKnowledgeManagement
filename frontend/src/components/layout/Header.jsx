@@ -1,10 +1,11 @@
+import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Network, Search, Tag, Settings } from 'lucide-react';
+import { BookOpen, Network, Search, Tag, Settings, FolderTree } from 'lucide-react';
 
 /**
- * Application header with search shortcut, breadcrumbs placeholder, and primary navigation tabs.
+ * Application header with responsive navigation, folder drawer toggle, and quick actions.
  */
-export function Header() {
+export function Header({ onToggleMobileDrawer }) {
   const location = useLocation();
 
   const navLinks = [
@@ -15,15 +16,31 @@ export function Header() {
   ];
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 lg:px-6">
-      <div className="flex items-center gap-4">
+    <header className="flex h-14 items-center justify-between border-b border-border bg-card px-3 sm:px-4 lg:px-6 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Mobile Folder Hierarchy Drawer Button */}
+        {onToggleMobileDrawer && (
+          <button
+            type="button"
+            onClick={onToggleMobileDrawer}
+            aria-label="Open folder hierarchy"
+            title="Open folder hierarchy"
+            className="md:hidden p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <FolderTree className="h-5 w-5 text-primary" />
+          </button>
+        )}
+
         <Link to="/notes" className="flex items-center gap-2 font-bold text-foreground">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm">
             K
           </span>
-          <span className="text-base tracking-tight">Knowledge App</span>
+          <span className="text-base tracking-tight truncate max-w-[150px] sm:max-w-none">
+            Knowledge App
+          </span>
         </Link>
 
+        {/* Desktop Navigation Tabs */}
         <nav className="hidden md:flex items-center gap-1 pl-4">
           {navLinks.map((item) => {
             const Icon = item.icon;
@@ -46,8 +63,8 @@ export function Header() {
         </nav>
       </div>
 
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <span className="hidden sm:inline-block text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded">
           v0.1.0 • PostgreSQL
         </span>
         <button
@@ -61,3 +78,7 @@ export function Header() {
     </header>
   );
 }
+
+Header.propTypes = {
+  onToggleMobileDrawer: PropTypes.func,
+};
