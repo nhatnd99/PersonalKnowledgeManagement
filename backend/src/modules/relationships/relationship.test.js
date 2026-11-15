@@ -62,6 +62,12 @@ jest.unstable_mockModule('../../config/database.js', () => {
           }
           return Promise.resolve([]);
         }),
+        update: jest.fn().mockImplementation(({ where, data }) => {
+          if (where.id === VALID_RELATION_ID) {
+            return Promise.resolve({ ...mockRelation, ...data });
+          }
+          return Promise.resolve(null);
+        }),
         delete: jest.fn().mockResolvedValue(mockRelation),
       },
       $connect: jest.fn().mockResolvedValue(undefined),
@@ -202,6 +208,52 @@ describe('Relationships API Endpoints (/api/v1/relationships & /api/v1/notes/:no
 
       expect(res.status).toBe(404);
       expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('PATCH /api/v1/relationships/:id', () => {
+    it('updates relationship type and label successfully', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/relationships/${VALID_RELATION_ID}`)
+        .send({
+          relationshipType: 'REFERENCES',
+          label: 'Updated reference link',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.relationshipType).toBe('REFERENCES');
+      expect(res.body.data.label).toBe('Updated reference link');
+    });
+
+    it('returns 404 for non-existent relationship update', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/relationships/${NON_EXISTENT_ID}`)
+        .send({ relationshipType: 'EXTENDS' });
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('rejects invalid relationship type with 400', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/relationships/${VALID_RELATION_ID}`)
+        .send({ relationshipType: 'INVALID_TYPE' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('GET /api/v1/relationships/:entityType/:entityId', () => {
+    it('returns relationships for given entity ID with 200', async () => {
+      const res = await request(app)
+        .get(`/api/v1/relationships/NOTE/${VALID_NOTE_1}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toHaveProperty('outgoing');
+      expect(res.body.data).toHaveProperty('incoming');
     });
   });
 

@@ -80,23 +80,29 @@ model Note {
   @@map("notes")
 }
 
-/// NoteRelationships table — independent, directional connections between notes.
+/// NoteRelationships table — independent, directional connections between notes and folders.
 /// Independent from parent-child hierarchy.
 model NoteRelationship {
   id               String           @id @default(uuid()) @db.Uuid
   sourceNoteId     String           @map("source_note_id") @db.Uuid
+  sourceType       NoteType         @default(NOTE) @map("source_type")
   targetNoteId     String           @map("target_note_id") @db.Uuid
+  targetType       NoteType         @default(NOTE) @map("target_type")
   relationshipType RelationshipType @map("relationship_type")
   description      String?          @db.VarChar(1000)
+  label            String?          @db.VarChar(255)
   createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at")
 
   sourceNote Note @relation("OutgoingRelations", fields: [sourceNoteId], references: [id], onDelete: Cascade)
   targetNote Note @relation("IncomingRelations", fields: [targetNoteId], references: [id], onDelete: Cascade)
 
-  // Composite unique constraint: prevent duplicate relationship of same type between two notes
+  // Composite unique constraint: prevent duplicate relationship of same type between two entities
   @@unique([sourceNoteId, targetNoteId, relationshipType])
   @@index([sourceNoteId])
   @@index([targetNoteId])
+  @@index([sourceType])
+  @@index([targetType])
   @@index([relationshipType])
   @@map("note_relationships")
 }

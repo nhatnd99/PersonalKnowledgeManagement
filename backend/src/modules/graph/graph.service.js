@@ -12,6 +12,7 @@ const NOTE_SELECT_FIELDS = {
   type: true,
   parentId: true,
   isFavorite: true,
+  archivedAt: true,
   updatedAt: true,
   tags: {
     include: {
@@ -168,7 +169,7 @@ export async function getFolderGraphData(options = {}) {
       select: NOTE_SELECT_FIELDS,
     });
 
-    if (!currentFolder || currentFolder.archivedAt !== null) {
+    if (!currentFolder || currentFolder.archivedAt) {
       throw new AppError(`Folder with ID ${folderId} not found`, 404);
     }
 
@@ -183,10 +184,17 @@ export async function getFolderGraphData(options = {}) {
       { id: currentFolder.id, title: currentFolder.title },
     ];
 
-    // Recursively collect all descendants at any level
-    descendants = await getAllDescendantEntities(folderId);
+    // Fetch direct children under this folder (immediate notes and subfolders)
+    descendants = await prisma.note.findMany({
+      where: {
+        parentId: folderId,
+        archivedAt: null,
+      },
+      select: NOTE_SELECT_FIELDS,
+      orderBy: [{ type: 'desc' }, { title: 'asc' }],
+    });
 
-    // Scope contains the container folder itself (Central Node) plus all descendants
+    // Scope contains the container folder itself (Central Node) plus direct children
     scopeNodes = [currentFolder, ...descendants];
   }
 
@@ -362,6 +370,12 @@ export async function getFolderGraphData(options = {}) {
     },
     nodes: allNodes,
     edges: allEdges,
+    metadata: {
+      nodeCount: allNodes.length,
+      edgeCount: allEdges.length,
+      folderCount,
+      noteCount,
+    },
     meta: {
       totalNodes: allNodes.length,
       scopeNodesCount: formattedScopeNodes.length,

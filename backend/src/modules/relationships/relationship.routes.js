@@ -3,6 +3,8 @@ import * as relationshipController from './relationship.controller.js';
 import {
   createRelationshipValidation,
   relationshipIdValidation,
+  updateRelationshipValidation,
+  getEntityRelationshipsValidation,
   getNoteRelationshipsValidation,
 } from './relationship.validation.js';
 import { validateRequest } from '../../middlewares/validateRequest.js';
@@ -32,11 +34,26 @@ router.get(
   relationshipController.getRelationshipByIdHandler
 );
 
+router.patch(
+  '/:id',
+  updateRelationshipValidation,
+  validateRequest,
+  relationshipController.updateRelationshipHandler
+);
+
 router.delete(
   '/:id',
   relationshipIdValidation,
   validateRequest,
   relationshipController.deleteRelationshipHandler
+);
+
+// Entity-scoped relationship lookup: /api/v1/relationships/:entityType/:entityId
+router.get(
+  '/:entityType/:entityId',
+  getEntityRelationshipsValidation,
+  validateRequest,
+  relationshipController.getEntityRelationshipsHandler
 );
 
 export default router;

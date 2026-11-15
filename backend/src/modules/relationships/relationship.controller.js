@@ -57,6 +57,32 @@ export async function getRelationshipByIdHandler(req, res) {
 }
 
 /**
+ * Update existing relationship by ID.
+ * PATCH /api/v1/relationships/:id
+ */
+export async function updateRelationshipHandler(req, res) {
+  const { id } = req.params;
+  const updated = await relationshipService.updateRelationship(id, req.body);
+  return sendSuccess(res, updated, 'Relationship updated successfully');
+}
+
+/**
+ * Get relationships for an entity by entityId (or entityType/entityId).
+ * GET /api/v1/relationships/:entityType/:entityId
+ */
+export async function getEntityRelationshipsHandler(req, res) {
+  const { entityId } = req.params;
+  const { direction, type } = req.query;
+
+  const result = await relationshipService.getRelationshipsForNote(entityId, {
+    direction,
+    type,
+  });
+
+  return sendSuccess(res, result, 'Entity relationships retrieved successfully');
+}
+
+/**
  * Delete relationship by ID.
  * DELETE /api/v1/relationships/:id
  */

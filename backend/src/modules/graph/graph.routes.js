@@ -15,7 +15,14 @@ router.get(
   graphController.listFoldersHandler
 );
 
-// Root Workspace Graph
+// Root Workspace Graph (/workspace & /root)
+router.get(
+  '/workspace',
+  getGraphValidation,
+  validateRequest,
+  graphController.getRootGraphHandler
+);
+
 router.get(
   '/root',
   getGraphValidation,

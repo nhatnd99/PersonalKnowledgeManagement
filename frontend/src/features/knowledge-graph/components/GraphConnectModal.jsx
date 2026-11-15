@@ -25,6 +25,7 @@ export function GraphConnectModal({
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
   const [relationshipType, setRelationshipType] = useState('RELATED_TO');
+  const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -32,6 +33,7 @@ export function GraphConnectModal({
   useEffect(() => {
     if (!isOpen) return;
     setError(null);
+    setLabel('');
     setDescription('');
 
     const initialSourceId = sourceNode?.id || (availableNodes[0]?.id || '');
@@ -65,6 +67,7 @@ export function GraphConnectModal({
         sourceNoteId: sourceId,
         targetNoteId: targetId,
         relationshipType,
+        label: label.trim() || undefined,
         description: description.trim() || undefined,
       });
 
@@ -179,6 +182,22 @@ export function GraphConnectModal({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Optional Label */}
+          <div>
+            <label htmlFor="connect-relationship-label" className="block font-medium text-foreground mb-1">
+              Relationship Label (optional)
+            </label>
+            <input
+              id="connect-relationship-label"
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="e.g. Implements, Explains, Depends upon"
+              maxLength={255}
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+            />
           </div>
 
           {/* Context Note / Description */}

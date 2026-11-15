@@ -66,3 +66,50 @@ export const relationshipIdValidation = [
     .isUUID(4)
     .withMessage('Relationship ID must be a valid UUIDv4'),
 ];
+
+/**
+ * Validation rules for updating an existing relationship.
+ */
+export const updateRelationshipValidation = [
+  param('id')
+    .isUUID(4)
+    .withMessage('Relationship ID must be a valid UUIDv4'),
+
+  body('relationshipType')
+    .optional()
+    .isIn(validRelationshipTypes)
+    .withMessage(`Relationship type must be one of: ${validRelationshipTypes.join(', ')}`),
+
+  body('label')
+    .optional({ nullable: true })
+    .isString()
+    .withMessage('Label must be a string')
+    .isLength({ max: 255 })
+    .withMessage('Label must not exceed 255 characters'),
+
+  body('description')
+    .optional({ nullable: true })
+    .isString()
+    .withMessage('Description must be a string')
+    .isLength({ max: 1000 })
+    .withMessage('Description must not exceed 1000 characters'),
+];
+
+/**
+ * Validation rules for querying entity relationships (e.g. /:entityType/:entityId).
+ */
+export const getEntityRelationshipsValidation = [
+  param('entityId')
+    .isUUID(4)
+    .withMessage('Entity ID must be a valid UUIDv4'),
+
+  query('direction')
+    .optional()
+    .isIn(['incoming', 'outgoing', 'both'])
+    .withMessage('Direction must be one of: incoming, outgoing, both'),
+
+  query('type')
+    .optional()
+    .isIn(validRelationshipTypes)
+    .withMessage(`Type must be one of: ${validRelationshipTypes.join(', ')}`),
+];

@@ -24,7 +24,9 @@ const NOTE_SELECT_FIELDS = {
  * @throws {AppError} 400 if self-referencing, 404 if either note not found, 409 if duplicate
  */
 export async function createRelationship(data) {
-  const { sourceNoteId, targetNoteId, relationshipType, description = null } = data;
+  const sourceNoteId = data.sourceNoteId || data.sourceId;
+  const targetNoteId = data.targetNoteId || data.targetId;
+  const { relationshipType, description = null, label = null } = data;
 
   if (sourceNoteId === targetNoteId) {
     throw new AppError('A note cannot have a relationship with itself', 400);
@@ -33,7 +35,7 @@ export async function createRelationship(data) {
   // Verify source note exists
   const sourceNote = await prisma.note.findUnique({
     where: { id: sourceNoteId },
-    select: { id: true },
+    select: { id: true, type: true },
   });
   if (!sourceNote) {
     throw new AppError(`Source note with ID ${sourceNoteId} not found`, 404);
@@ -42,19 +44,25 @@ export async function createRelationship(data) {
   // Verify target note exists
   const targetNote = await prisma.note.findUnique({
     where: { id: targetNoteId },
-    select: { id: true },
+    select: { id: true, type: true },
   });
   if (!targetNote) {
     throw new AppError(`Target note with ID ${targetNoteId} not found`, 404);
   }
 
+  const effectiveLabel = label || description || null;
+  const effectiveDescription = description || label || null;
+
   try {
     const relationship = await prisma.noteRelationship.create({
       data: {
         sourceNoteId,
+        sourceType: sourceNote.type,
         targetNoteId,
+        targetType: targetNote.type,
         relationshipType,
-        description,
+        description: effectiveDescription,
+        label: effectiveLabel,
       },
       include: {
         sourceNote: { select: NOTE_SELECT_FIELDS },
@@ -185,6 +193,64 @@ export async function getRelationshipById(id) {
   }
 
   return relationship;
+}
+
+/**
+ * Update an existing relationship (type, label, or description).
+ *
+ * @param {string} id - Relationship UUID
+ * @param {Object} data - Update payload
+ * @returns {Promise<Object>} Updated relationship
+ * @throws {AppError} 404 if not found, 409 if changing type to an existing duplicate
+ */
+export async function updateRelationship(id, data) {
+  const existing = await prisma.noteRelationship.findUnique({
+    where: { id },
+  });
+
+  if (!existing) {
+    throw new AppError(`Relationship with ID ${id} not found`, 404);
+  }
+
+  const { relationshipType, description, label } = data;
+
+  const updateData = {};
+  if (relationshipType !== undefined) {
+    updateData.relationshipType = relationshipType;
+  }
+  if (label !== undefined) {
+    updateData.label = label;
+    if (description === undefined && !existing.description) {
+      updateData.description = label;
+    }
+  }
+  if (description !== undefined) {
+    updateData.description = description;
+    if (label === undefined && !existing.label) {
+      updateData.label = description;
+    }
+  }
+
+  try {
+    const updated = await prisma.noteRelationship.update({
+      where: { id },
+      data: updateData,
+      include: {
+        sourceNote: { select: NOTE_SELECT_FIELDS },
+        targetNote: { select: NOTE_SELECT_FIELDS },
+      },
+    });
+
+    return updated;
+  } catch (error) {
+    if (error.code === 'P2002') {
+      throw new AppError(
+        `Relationship of type "${relationshipType}" between these entities already exists`,
+        409
+      );
+    }
+    throw error;
+  }
 }
 
 /**

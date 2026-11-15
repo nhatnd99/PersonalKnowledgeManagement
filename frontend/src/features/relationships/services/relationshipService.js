@@ -37,8 +37,23 @@ export const relationshipService = {
   },
 
   /**
+   * Update a relationship by ID.
+   * @param {string} relationshipId
+   * @param {Object} payload
+   * @param {string} [payload.relationshipType]
+   * @param {string} [payload.label]
+   * @param {string} [payload.description]
+   * @returns {Promise<Object>} Updated relationship
+   */
+  async updateRelationship(relationshipId, payload) {
+    const response = await apiClient.patch(`/relationships/${relationshipId}`, payload);
+    return response.data.data;
+  },
+
+  /**
    * Delete a relationship by ID.
    * @param {string} relationshipId
+   * @param {Object} payload
    * @returns {Promise<void>}
    */
   async deleteRelationship(relationshipId) {
