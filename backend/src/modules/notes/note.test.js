@@ -167,6 +167,38 @@ describe('Notes API Endpoints (/api/v1/notes)', () => {
       expect(res.body.success).toBe(true);
       expect(res.body.data.title).toBe('Updated Title');
     });
+
+    it('persists Unicode characters, spaces and punctuation in title', async () => {
+      const unicodeTitle = 'Kiến Trúc Hệ Thống: Microservices & Event-Driven 🚀 (v2.0)';
+      const res = await request(app)
+        .patch(`/api/v1/notes/${VALID_NOTE_ID}`)
+        .send({ title: unicodeTitle });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.title).toBe(unicodeTitle);
+    });
+
+    it('allows clearing title to empty string for visual fallback', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/notes/${VALID_NOTE_ID}`)
+        .send({ title: '' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.title).toBe('');
+    });
+
+    it('rejects title longer than 500 characters with 400', async () => {
+      const tooLongTitle = 'a'.repeat(501);
+      const res = await request(app)
+        .patch(`/api/v1/notes/${VALID_NOTE_ID}`)
+        .send({ title: tooLongTitle });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.errors[0].field).toBe('title');
+    });
   });
 
   describe('PATCH /api/v1/notes/:noteId/move', () => {

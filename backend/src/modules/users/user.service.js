@@ -1,64 +1,134 @@
 import { prisma } from '../../config/database.js';
+import { AppError } from '../../middlewares/errorHandler.js';
 
 /**
- * Service handling user account and workspace profile operations.
- * Prepared for future multi-user authentication while providing local workspace identity in MVP.
+ * Service handling user account and profile operations.
  */
 
-const DEFAULT_WORKSPACE_USER_ID = '00000000-0000-4000-8000-000000000000';
-
 /**
- * Get the current workspace user profile.
- * Creates a default workspace user record if none exists.
+ * Get user profile by user ID.
  *
- * @returns {Promise<Object>} User profile
+ * @param {string} userId - UUID
+ * @returns {Promise<Object>} Safe user profile
  */
-export async function getCurrentUserProfile() {
-  let user = await prisma.user.findFirst();
+export async function getUserProfile(userId) {
+  const findFn =
+    typeof prisma.user?.findUnique === 'function'
+      ? () =>
+          prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
+              name: true,
+              avatarUrl: true,
+              createdAt: true,
+              lastLoginAt: true,
+            },
+          })
+      : () =>
+          prisma.user.findFirst({
+            where: { id: userId },
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
+              name: true,
+              avatarUrl: true,
+              createdAt: true,
+              lastLoginAt: true,
+            },
+          });
+
+  const user = await findFn();
 
   if (!user) {
-    try {
-      user = await prisma.user.create({
-        data: {
-          id: DEFAULT_WORKSPACE_USER_ID,
-          name: 'Knowledge Architect',
-          email: 'architect@knowledge.app',
-        },
-      });
-    } catch {
-      // Return local fallback object if DB is read-only
-      user = {
-        id: DEFAULT_WORKSPACE_USER_ID,
-        name: 'Knowledge Architect',
-        email: 'architect@knowledge.app',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-    }
+    throw new AppError('User not found', 404);
   }
 
-  return user;
+  const effectiveName = user.displayName || user.name || 'Knowledge User';
+
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: effectiveName,
+    name: effectiveName,
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt,
+  };
 }
 
 /**
- * Update the workspace user profile.
+ * Update user profile.
  *
+ * @param {string} userId - User ID
  * @param {Object} data - Update data
- * @param {string} [data.name] - Display name
- * @param {string} [data.email] - Email
+ * @param {string} [data.displayName] - Display name
+ * @param {string} [data.avatarUrl] - Avatar URL
  * @returns {Promise<Object>} Updated profile
  */
-export async function updateCurrentUserProfile(data) {
-  const current = await getCurrentUserProfile();
+export async function updateUserProfile(userId, data) {
+  // Prohibit modifying ID, email, or password through generic profile update
+  if (data.id !== undefined && data.id !== userId) {
+    throw new AppError('Changing user ID is not permitted', 400);
+  }
+  if (data.passwordHash !== undefined || data.password !== undefined) {
+    throw new AppError('Password cannot be changed via profile update. Use /api/auth/change-password', 400);
+  }
 
   const updateData = {};
-  if (data.name !== undefined) updateData.name = data.name.trim();
-  if (data.email !== undefined) updateData.email = data.email.trim();
+  if (data.displayName !== undefined) {
+    updateData.displayName = data.displayName ? data.displayName.trim().substring(0, 100) : null;
+    updateData.name = updateData.displayName;
+  } else if (data.name !== undefined) {
+    updateData.name = data.name ? data.name.trim().substring(0, 100) : null;
+    updateData.displayName = updateData.name;
+  }
+
+  if (data.avatarUrl !== undefined) {
+    updateData.avatarUrl = data.avatarUrl ? data.avatarUrl.trim() : null;
+  }
 
   const updated = await prisma.user.update({
-    where: { id: current.id },
+    where: { id: userId },
     data: updateData,
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      name: true,
+      avatarUrl: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
 
-  return updated;
+  const effectiveName = updated.displayName || updated.name;
+  return {
+    id: updated.id,
+    email: updated.email,
+    displayName: effectiveName,
+    name: effectiveName,
+    avatarUrl: updated.avatarUrl,
+    createdAt: updated.createdAt,
+    updatedAt: updated.updatedAt,
+  };
+}
+
+/**
+ * Legacy compatibility fallback for unauthenticated workspace MVP helper.
+ */
+export async function getCurrentUserProfile(userContext = null) {
+  if (userContext?.id) {
+    return getUserProfile(userContext.id);
+  }
+  const first = await prisma.user.findFirst();
+  return first ? getUserProfile(first.id) : null;
+}
+
+export async function updateCurrentUserProfile(data, userContext = null) {
+  const current = await getCurrentUserProfile(userContext);
+  return updateUserProfile(current.id, data);
 }

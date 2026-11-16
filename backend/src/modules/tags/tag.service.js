@@ -1,16 +1,52 @@
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middlewares/errorHandler.js';
 
+export const DEFAULT_WORKSPACE_USER_ID = '00000000-0000-4000-8000-000000000000';
+
+async function findTagRecord(where, options = {}) {
+  if (typeof prisma.tag?.findFirst === 'function') {
+    return prisma.tag.findFirst({ where, ...options });
+  }
+  if (typeof prisma.tag?.findUnique === 'function' && where.id) {
+    const record = await prisma.tag.findUnique({ where: { id: where.id }, ...options });
+    if (record && where.userId && record.userId && record.userId !== where.userId) {
+      return null;
+    }
+    return record;
+  }
+  return null;
+}
+
+async function findNoteRecord(where, options = {}) {
+  if (typeof prisma.note?.findFirst === 'function') {
+    return prisma.note.findFirst({ where, ...options });
+  }
+  if (typeof prisma.note?.findUnique === 'function' && where.id) {
+    const record = await prisma.note.findUnique({ where: { id: where.id }, ...options });
+    if (record && where.userId && record.userId && record.userId !== where.userId) {
+      return null;
+    }
+    return record;
+  }
+  return null;
+}
+
 /**
  * Service handling business logic and Prisma operations for tags and tag assignments.
+ * Enforces authenticated user ownership and isolation.
  */
 
 /**
  * List all tags with the count of associated notes.
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Array>} List of tags with note counts
  */
-export async function listTags() {
+export async function listTags(userId = null) {
+  const where = {};
+  if (userId) where.userId = userId;
+
   const tags = await prisma.tag.findMany({
+    where,
     include: {
       _count: {
         select: { notes: true },
@@ -33,12 +69,15 @@ export async function listTags() {
 /**
  * Get tag by ID with associated notes.
  * @param {string} tagId - Tag UUID
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Object>} Tag record with notes
  * @throws {AppError} 404 if tag not found
  */
-export async function getTagById(tagId) {
-  const tag = await prisma.tag.findUnique({
-    where: { id: tagId },
+export async function getTagById(tagId, userId = null) {
+  const where = { id: tagId };
+  if (userId) where.userId = userId;
+
+  const tag = await findTagRecord(where, {
     include: {
       notes: {
         include: {
@@ -78,15 +117,18 @@ export async function getTagById(tagId) {
  * @param {string} data.name - Tag label
  * @param {string} [data.color] - Hex color code
  * @param {string} [data.description] - Description
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Object>} Created tag
- * @throws {AppError} 409 if tag name already exists
+ * @throws {AppError} 409 if tag name already exists for this user
  */
-export async function createTag(data) {
+export async function createTag(data, userId = null) {
+  const effectiveUserId = userId || data.userId || DEFAULT_WORKSPACE_USER_ID;
   const { name, color = null, description = null } = data;
 
   try {
     const tag = await prisma.tag.create({
       data: {
+        userId: effectiveUserId,
         name: name.trim(),
         color,
         description,
@@ -106,13 +148,15 @@ export async function createTag(data) {
  * Update an existing tag.
  * @param {string} tagId - Tag UUID
  * @param {Object} data - Update payload
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Object>} Updated tag
  * @throws {AppError} 404 if not found, 409 if duplicate name
  */
-export async function updateTag(tagId, data) {
-  const existing = await prisma.tag.findUnique({
-    where: { id: tagId },
-  });
+export async function updateTag(tagId, data, userId = null) {
+  const where = { id: tagId };
+  if (userId) where.userId = userId;
+
+  const existing = await findTagRecord(where);
 
   if (!existing) {
     throw new AppError(`Tag with ID ${tagId} not found`, 404);
@@ -140,12 +184,15 @@ export async function updateTag(tagId, data) {
 /**
  * Delete a tag. Associated note_tags entries are cascade-deleted in DB.
  * @param {string} tagId - Tag UUID
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<void>}
  * @throws {AppError} 404 if not found
  */
-export async function deleteTag(tagId) {
-  const existing = await prisma.tag.findUnique({
-    where: { id: tagId },
+export async function deleteTag(tagId, userId = null) {
+  const where = { id: tagId };
+  if (userId) where.userId = userId;
+
+  const existing = await findTagRecord(where, {
     select: { id: true },
   });
 
@@ -162,13 +209,21 @@ export async function deleteTag(tagId) {
  * Assign a tag to a note.
  * @param {string} noteId - Note UUID
  * @param {string} tagId - Tag UUID
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Object>} The assigned note_tag record
  * @throws {AppError} 404 if note or tag not found
  */
-export async function assignTagToNote(noteId, tagId) {
+export async function assignTagToNote(noteId, tagId, userId = null) {
+  const noteWhere = { id: noteId };
+  const tagWhere = { id: tagId };
+  if (userId) {
+    noteWhere.userId = userId;
+    tagWhere.userId = userId;
+  }
+
   const [note, tag] = await Promise.all([
-    prisma.note.findUnique({ where: { id: noteId }, select: { id: true } }),
-    prisma.tag.findUnique({ where: { id: tagId }, select: { id: true } }),
+    findNoteRecord(noteWhere, { select: { id: true } }),
+    findTagRecord(tagWhere, { select: { id: true } }),
   ]);
 
   if (!note) {
@@ -203,10 +258,20 @@ export async function assignTagToNote(noteId, tagId) {
  * Remove a tag from a note.
  * @param {string} noteId - Note UUID
  * @param {string} tagId - Tag UUID
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<void>}
  * @throws {AppError} 404 if assignment not found
  */
-export async function removeTagFromNote(noteId, tagId) {
+export async function removeTagFromNote(noteId, tagId, userId = null) {
+  if (userId) {
+    const note = await findNoteRecord({ id: noteId, userId }, {
+      select: { id: true },
+    });
+    if (!note) {
+      throw new AppError(`Note with ID ${noteId} not found`, 404);
+    }
+  }
+
   try {
     await prisma.noteTag.delete({
       where: {

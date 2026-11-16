@@ -3,13 +3,14 @@ import { sendSuccess, sendCreated, sendNoContent, buildPaginationMeta } from '..
 
 /**
  * Controller handling HTTP requests for the notes domain.
+ * Enforces authenticated user ownership on all operations.
  */
 
 /**
  * POST /api/v1/notes
  */
 export async function createNote(req, res) {
-  const note = await noteService.createNote(req.body);
+  const note = await noteService.createNote(req.body, req.user?.id);
   return sendCreated(res, note, 'Note created successfully');
 }
 
@@ -17,7 +18,7 @@ export async function createNote(req, res) {
  * GET /api/v1/notes/:noteId
  */
 export async function getNoteById(req, res) {
-  const note = await noteService.getNoteById(req.params.noteId);
+  const note = await noteService.getNoteById(req.params.noteId, req.user?.id);
   return sendSuccess(res, note, 'Note retrieved successfully');
 }
 
@@ -25,7 +26,7 @@ export async function getNoteById(req, res) {
  * GET /api/v1/notes
  */
 export async function listNotes(req, res) {
-  const { notes, total, page, limit } = await noteService.listNotes(req.query);
+  const { notes, total, page, limit } = await noteService.listNotes(req.query, req.user?.id);
   const meta = buildPaginationMeta(total, page, limit);
   return sendSuccess(res, notes, 'Notes retrieved successfully', 200, meta);
 }
@@ -34,7 +35,7 @@ export async function listNotes(req, res) {
  * PATCH /api/v1/notes/:noteId
  */
 export async function updateNote(req, res) {
-  const note = await noteService.updateNote(req.params.noteId, req.body);
+  const note = await noteService.updateNote(req.params.noteId, req.body, req.user?.id);
   return sendSuccess(res, note, 'Note updated successfully');
 }
 
@@ -42,7 +43,7 @@ export async function updateNote(req, res) {
  * PUT /api/v1/notes/:noteId/content
  */
 export async function updateNoteContent(req, res) {
-  const note = await noteService.updateNoteContent(req.params.noteId, req.body);
+  const note = await noteService.updateNoteContent(req.params.noteId, req.body, req.user?.id);
   return sendSuccess(res, note, 'Note content updated successfully');
 }
 
@@ -76,7 +77,7 @@ export async function handleImageUpload(req, res) {
  */
 export async function moveNote(req, res) {
   const { newParentId } = req.body;
-  const note = await noteService.moveNote(req.params.noteId, newParentId);
+  const note = await noteService.moveNote(req.params.noteId, newParentId, req.user?.id);
   return sendSuccess(res, note, 'Note moved successfully');
 }
 
@@ -84,7 +85,7 @@ export async function moveNote(req, res) {
  * GET /api/v1/notes/:noteId/delete-preview
  */
 export async function getDeletePreview(req, res) {
-  const preview = await noteService.getDeletePreview(req.params.noteId);
+  const preview = await noteService.getDeletePreview(req.params.noteId, req.user?.id);
   return sendSuccess(res, preview);
 }
 
@@ -95,6 +96,6 @@ export async function deleteNote(req, res) {
   const { cascade } = req.query;
   await noteService.deleteNote(req.params.noteId, {
     cascade: cascade !== 'false',
-  });
+  }, req.user?.id);
   return sendNoContent(res);
 }

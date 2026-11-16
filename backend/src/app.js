@@ -3,10 +3,13 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 import 'express-async-errors';
 
 import { env } from './config/env.js';
 import { notFoundHandler, globalErrorHandler } from './middlewares/errorHandler.js';
+import { authenticate, requireAuth } from './middlewares/auth.js';
+import authRoutes from './modules/auth/auth.routes.js';
 import noteRoutes from './modules/notes/note.routes.js';
 import relationshipRoutes from './modules/relationships/relationship.routes.js';
 import tagRoutes from './modules/tags/tag.routes.js';
@@ -35,7 +38,7 @@ export function createApp() {
       origin: env.corsOrigin,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Anonymous', 'X-Unauthenticated'],
     })
   );
 
@@ -52,9 +55,13 @@ export function createApp() {
   });
   app.use('/api', limiter);
 
-  // ─── Request Parsing ──────────────────────────────────────────────────────
+  // ─── Request & Cookie Parsing ─────────────────────────────────────────────
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
+
+  // ─── Authentication Middleware ────────────────────────────────────────────
+  app.use(authenticate);
 
   // ─── Logging ─────────────────────────────────────────────────────────────
   if (!env.isTest) {
@@ -80,21 +87,28 @@ export function createApp() {
       database: 'PostgreSQL (Prisma ORM)',
       endpoints: {
         health: '/health',
-        notes: '/api/v1/notes (planned Phase 1)',
-        relationships: '/api/v1/relationships (planned Phase 3)',
-        tags: '/api/v1/tags (planned Phase 4)',
-        search: '/api/v1/search (planned Phase 4)',
+        auth: '/api/auth or /api/v1/auth',
+        users: '/api/users or /api/v1/users',
+        notes: '/api/v1/notes',
+        relationships: '/api/v1/relationships',
+        tags: '/api/v1/tags',
+        search: '/api/v1/search',
+        graph: '/api/v1/graph',
       },
     });
   });
 
-  // ─── API v1 Routes ────────────────────────────────────────────────────────
-  app.use('/api/v1/notes', noteRoutes);
-  app.use('/api/v1/relationships', relationshipRoutes);
-  app.use('/api/v1/tags', tagRoutes);
-  app.use('/api/v1/search', searchRoutes);
-  app.use('/api/v1/graph', graphRoutes);
-  app.use('/api/v1/user', userRoutes);
+  // ─── API Routes ───────────────────────────────────────────────────────────
+  // Authentication & Users (accessible at both /api/auth and /api/v1/auth)
+  app.use(['/api/auth', '/api/v1/auth'], authRoutes);
+  app.use(['/api/users', '/api/v1/user', '/api/v1/users'], userRoutes);
+
+  // Protected Core Application Routes
+  app.use('/api/v1/notes', requireAuth, noteRoutes);
+  app.use(['/api/v1/relationships', '/api/v1/note-relationships'], requireAuth, relationshipRoutes);
+  app.use('/api/v1/tags', requireAuth, tagRoutes);
+  app.use('/api/v1/search', requireAuth, searchRoutes);
+  app.use('/api/v1/graph', requireAuth, graphRoutes);
 
   // ─── Error Handling ───────────────────────────────────────────────────────
   app.use(notFoundHandler);

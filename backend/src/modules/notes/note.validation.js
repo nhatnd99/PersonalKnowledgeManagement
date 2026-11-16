@@ -50,12 +50,11 @@ export const updateNoteValidation = [
     .withMessage('Note ID must be a valid UUID'),
 
   body('title')
-    .optional()
-    .trim()
-    .notEmpty()
-    .withMessage('Title cannot be empty')
-    .isLength({ min: 1, max: 500 })
-    .withMessage('Title must be between 1 and 500 characters'),
+    .optional({ nullable: true })
+    .isString()
+    .withMessage('Title must be a string')
+    .isLength({ max: 500 })
+    .withMessage('Title must be at most 500 characters'),
 
   body('type')
     .optional()

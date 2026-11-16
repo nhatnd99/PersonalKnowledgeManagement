@@ -3,6 +3,7 @@ import { sendSuccess, sendCreated, sendNoContent } from '../../utils/apiResponse
 
 /**
  * Controller handling HTTP requests for note relationships.
+ * Enforces authenticated user ownership on all operations.
  */
 
 /**
@@ -10,7 +11,7 @@ import { sendSuccess, sendCreated, sendNoContent } from '../../utils/apiResponse
  * POST /api/v1/relationships
  */
 export async function createRelationshipHandler(req, res) {
-  const relationship = await relationshipService.createRelationship(req.body);
+  const relationship = await relationshipService.createRelationship(req.body, req.user?.id);
   return sendCreated(res, relationship, 'Relationship created successfully');
 }
 
@@ -22,10 +23,11 @@ export async function getNoteRelationshipsHandler(req, res) {
   const { noteId } = req.params;
   const { direction, type } = req.query;
 
-  const result = await relationshipService.getRelationshipsForNote(noteId, {
-    direction,
-    type,
-  });
+  const result = await relationshipService.getRelationshipsForNote(
+    noteId,
+    { direction, type },
+    req.user?.id
+  );
 
   return sendSuccess(res, result, 'Relationships retrieved successfully');
 }
@@ -37,11 +39,10 @@ export async function getNoteRelationshipsHandler(req, res) {
 export async function listRelationshipsHandler(req, res) {
   const { sourceNoteId, targetNoteId, relationshipType } = req.query;
 
-  const relationships = await relationshipService.listRelationships({
-    sourceNoteId,
-    targetNoteId,
-    relationshipType,
-  });
+  const relationships = await relationshipService.listRelationships(
+    { sourceNoteId, targetNoteId, relationshipType },
+    req.user?.id
+  );
 
   return sendSuccess(res, relationships, 'Relationships retrieved successfully');
 }
@@ -52,7 +53,7 @@ export async function listRelationshipsHandler(req, res) {
  */
 export async function getRelationshipByIdHandler(req, res) {
   const { id } = req.params;
-  const relationship = await relationshipService.getRelationshipById(id);
+  const relationship = await relationshipService.getRelationshipById(id, req.user?.id);
   return sendSuccess(res, relationship, 'Relationship retrieved successfully');
 }
 
@@ -62,22 +63,23 @@ export async function getRelationshipByIdHandler(req, res) {
  */
 export async function updateRelationshipHandler(req, res) {
   const { id } = req.params;
-  const updated = await relationshipService.updateRelationship(id, req.body);
+  const updated = await relationshipService.updateRelationship(id, req.body, req.user?.id);
   return sendSuccess(res, updated, 'Relationship updated successfully');
 }
 
 /**
- * Get relationships for an entity by entityId (or entityType/entityId).
+ * Get relationships for an entity by entityId.
  * GET /api/v1/relationships/:entityType/:entityId
  */
 export async function getEntityRelationshipsHandler(req, res) {
   const { entityId } = req.params;
   const { direction, type } = req.query;
 
-  const result = await relationshipService.getRelationshipsForNote(entityId, {
-    direction,
-    type,
-  });
+  const result = await relationshipService.getRelationshipsForNote(
+    entityId,
+    { direction, type },
+    req.user?.id
+  );
 
   return sendSuccess(res, result, 'Entity relationships retrieved successfully');
 }
@@ -88,6 +90,6 @@ export async function getEntityRelationshipsHandler(req, res) {
  */
 export async function deleteRelationshipHandler(req, res) {
   const { id } = req.params;
-  await relationshipService.deleteRelationship(id);
+  await relationshipService.deleteRelationship(id, req.user?.id);
   return sendNoContent(res);
 }

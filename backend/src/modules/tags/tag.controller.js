@@ -3,14 +3,15 @@ import { sendSuccess, sendCreated, sendNoContent } from '../../utils/apiResponse
 
 /**
  * Controller handling HTTP requests for tags and note tag assignments.
+ * Enforces authenticated user ownership on all operations.
  */
 
 /**
  * List all tags.
  * GET /api/v1/tags
  */
-export async function listTagsHandler(_req, res) {
-  const tags = await tagService.listTags();
+export async function listTagsHandler(req, res) {
+  const tags = await tagService.listTags(req.user?.id);
   return sendSuccess(res, tags, 'Tags retrieved successfully');
 }
 
@@ -20,7 +21,7 @@ export async function listTagsHandler(_req, res) {
  */
 export async function getTagByIdHandler(req, res) {
   const { tagId } = req.params;
-  const tag = await tagService.getTagById(tagId);
+  const tag = await tagService.getTagById(tagId, req.user?.id);
   return sendSuccess(res, tag, 'Tag retrieved successfully');
 }
 
@@ -29,7 +30,7 @@ export async function getTagByIdHandler(req, res) {
  * POST /api/v1/tags
  */
 export async function createTagHandler(req, res) {
-  const tag = await tagService.createTag(req.body);
+  const tag = await tagService.createTag(req.body, req.user?.id);
   return sendCreated(res, tag, 'Tag created successfully');
 }
 
@@ -39,7 +40,7 @@ export async function createTagHandler(req, res) {
  */
 export async function updateTagHandler(req, res) {
   const { tagId } = req.params;
-  const updated = await tagService.updateTag(tagId, req.body);
+  const updated = await tagService.updateTag(tagId, req.body, req.user?.id);
   return sendSuccess(res, updated, 'Tag updated successfully');
 }
 
@@ -49,7 +50,7 @@ export async function updateTagHandler(req, res) {
  */
 export async function deleteTagHandler(req, res) {
   const { tagId } = req.params;
-  await tagService.deleteTag(tagId);
+  await tagService.deleteTag(tagId, req.user?.id);
   return sendNoContent(res);
 }
 
@@ -60,7 +61,7 @@ export async function deleteTagHandler(req, res) {
 export async function assignTagToNoteHandler(req, res) {
   const { noteId } = req.params;
   const { tagId } = req.body;
-  const noteTag = await tagService.assignTagToNote(noteId, tagId);
+  const noteTag = await tagService.assignTagToNote(noteId, tagId, req.user?.id);
   return sendCreated(res, noteTag, 'Tag assigned to note successfully');
 }
 
@@ -70,6 +71,6 @@ export async function assignTagToNoteHandler(req, res) {
  */
 export async function removeTagFromNoteHandler(req, res) {
   const { noteId, tagId } = req.params;
-  await tagService.removeTagFromNote(noteId, tagId);
+  await tagService.removeTagFromNote(noteId, tagId, req.user?.id);
   return sendNoContent(res);
 }

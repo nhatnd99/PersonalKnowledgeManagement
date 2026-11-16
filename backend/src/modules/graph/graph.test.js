@@ -240,6 +240,28 @@ describe('Knowledge Graph API Endpoints (/api/v1/graph)', () => {
       expect(hierarchyEdges[0].source).toBe(VALID_FOLDER_1);
     });
 
+    it('excludes semantic knowledge edges when includeKnowledge=false', async () => {
+      const res = await request(app).get(
+        `/api/v1/graph/folders/${VALID_FOLDER_1}?includeKnowledge=false&includeHierarchy=true`
+      );
+
+      expect(res.status).toBe(200);
+      const knowledgeEdges = res.body.data.edges.filter((e) => !e.isHierarchy);
+      expect(knowledgeEdges.length).toBe(0);
+      const hierarchyEdges = res.body.data.edges.filter((e) => e.isHierarchy);
+      expect(hierarchyEdges.length).toBe(2);
+    });
+
+    it('excludes external nodes when includeExternal=false', async () => {
+      const res = await request(app).get(
+        `/api/v1/graph/folders/${VALID_FOLDER_1}?includeExternal=false`
+      );
+
+      expect(res.status).toBe(200);
+      const externalNodes = res.body.data.nodes.filter((n) => n.isExternal);
+      expect(externalNodes.length).toBe(0);
+    });
+
     it('returns 404 for non-existent folder ID', async () => {
       const res = await request(app).get(
         '/api/v1/graph/folders/99999999-9999-4999-8999-999999999999'

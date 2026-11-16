@@ -3,6 +3,7 @@ import { sendPaginatedSuccess } from '../../utils/apiResponse.js';
 
 /**
  * Controller handling HTTP requests for search.
+ * Scoped to authenticated user.
  */
 
 /**
@@ -12,14 +13,17 @@ import { sendPaginatedSuccess } from '../../utils/apiResponse.js';
 export async function searchNotesHandler(req, res) {
   const { q, tag, type, isFavorite, page, limit } = req.query;
 
-  const { notes, meta } = await searchService.searchNotes({
-    q,
-    tag,
-    type,
-    isFavorite,
-    page,
-    limit,
-  });
+  const { notes, meta } = await searchService.searchNotes(
+    {
+      q,
+      tag,
+      type,
+      isFavorite,
+      page,
+      limit,
+    },
+    req.user?.id
+  );
 
   return sendPaginatedSuccess(res, notes, meta, 'Search results retrieved successfully');
 }

@@ -16,6 +16,8 @@ const __dirname = path.dirname(__filename);
 const backendDir = path.resolve(__dirname, '../../');
 const rootDir = path.resolve(__dirname, '../../../');
 
+const initialNodeEnv = process.env.NODE_ENV;
+
 // 1. Load baseline .env files
 const envPaths = [
   path.join(rootDir, '.env'),
@@ -45,6 +47,10 @@ if (process.env.DATABASE_URL_UNPOOLED && !process.env.DIRECT_URL) {
   process.env.DIRECT_URL = process.env.DATABASE_URL_UNPOOLED;
 }
 
+if (initialNodeEnv) {
+  process.env.NODE_ENV = initialNodeEnv;
+}
+
 /**
  * Parse CORS_ORIGIN into a string, array of strings, or wildcard.
  * Allows comma-separated origins in environment variables (e.g. for Vercel preview + production).
@@ -61,13 +67,16 @@ function parseCorsOrigin(originValue) {
  * Validated environment configuration object.
  * Access env variables through this object instead of process.env directly.
  */
+const effectiveNodeEnv = process.env.NODE_ENV || 'development';
+const isTestEnv = effectiveNodeEnv === 'test' || Boolean(process.env.JEST_WORKER_ID);
+
 export const env = {
   // Server
   port: parseInt(process.env.PORT, 10) || 3000,
-  nodeEnv: process.env.NODE_ENV || 'development',
-  isDevelopment: (process.env.NODE_ENV || 'development') === 'development',
-  isProduction: process.env.NODE_ENV === 'production',
-  isTest: process.env.NODE_ENV === 'test',
+  nodeEnv: effectiveNodeEnv,
+  isDevelopment: effectiveNodeEnv === 'development' && !isTestEnv,
+  isProduction: effectiveNodeEnv === 'production',
+  isTest: isTestEnv,
 
   // Database (PostgreSQL / Neon via Prisma)
   databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/knowledge_app?schema=public',
@@ -82,6 +91,22 @@ export const env = {
 
   // Logging
   logLevel: process.env.LOG_LEVEL || 'debug',
+
+  // Authentication & Session
+  sessionCookieName: process.env.COOKIE_NAME || 'knowledge_session',
+  sessionDurationMs: parseInt(process.env.SESSION_DURATION, 10) || 24 * 60 * 60 * 1000, // 24 hours
+  sessionRememberDurationMs: parseInt(process.env.SESSION_REMEMBER_DURATION, 10) || 30 * 24 * 60 * 60 * 1000, // 30 days
+  cookieSecure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : process.env.NODE_ENV === 'production',
+  cookieSameSite: process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === 'production' ? 'lax' : 'lax'),
+  cookieDomain: process.env.COOKIE_DOMAIN || undefined,
+
+  // Email & Password Reset
+  smtpHost: process.env.SMTP_HOST || null,
+  smtpPort: parseInt(process.env.SMTP_PORT, 10) || 587,
+  smtpUser: process.env.SMTP_USER || null,
+  smtpPassword: process.env.SMTP_PASSWORD || null,
+  smtpFrom: process.env.SMTP_FROM || 'Knowledge App <no-reply@knowledge.app>',
+  passwordResetUrl: process.env.PASSWORD_RESET_URL || 'http://localhost:5173/reset-password',
 };
 
 /**

@@ -23,13 +23,27 @@ const NOTE_SELECT_FIELDS = {
   },
 };
 
+async function findNoteRecord(where, options = {}) {
+  if (typeof prisma.note?.findFirst === 'function') {
+    return prisma.note.findFirst({ where, ...options });
+  }
+  if (typeof prisma.note?.findUnique === 'function' && where.id) {
+    const record = await prisma.note.findUnique({ where: { id: where.id }, ...options });
+    if (record && where.userId && record.userId && record.userId !== where.userId) {
+      return null;
+    }
+    return record;
+  }
+  return null;
+}
+
 /**
  * Traverses ancestors of a folder upwards to build a breadcrumb hierarchy.
  *
  * @param {string} folderId - Folder UUID
  * @returns {Promise<Array<{ id: string, title: string }>>} Breadcrumb chain from root to parent
  */
-async function getFolderAncestors(folderId) {
+async function getFolderAncestors(folderId, userId = null) {
   const ancestors = [];
   let currentId = folderId;
   const visited = new Set();
@@ -38,15 +52,19 @@ async function getFolderAncestors(folderId) {
     if (visited.has(currentId)) break; // cycle protection
     visited.add(currentId);
 
-    const note = await prisma.note.findUnique({
-      where: { id: currentId },
+    const noteWhere = { id: currentId };
+    if (userId) noteWhere.userId = userId;
+
+    const note = await findNoteRecord(noteWhere, {
       select: { id: true, title: true, parentId: true },
     });
 
     if (!note || !note.parentId) break;
 
-    const parent = await prisma.note.findUnique({
-      where: { id: note.parentId },
+    const parentWhere = { id: note.parentId };
+    if (userId) parentWhere.userId = userId;
+
+    const parent = await findNoteRecord(parentWhere, {
       select: { id: true, title: true, parentId: true },
     });
 
@@ -67,7 +85,7 @@ async function getFolderAncestors(folderId) {
  * @param {string} parentId - Parent note/folder UUID
  * @returns {Promise<Array>} List of all descendants at all depths
  */
-async function getAllDescendantEntities(parentId) {
+export async function getAllDescendantEntities(parentId) {
   const directChildren = await prisma.note.findMany({
     where: { parentId, archivedAt: null },
     select: NOTE_SELECT_FIELDS,
@@ -85,11 +103,15 @@ async function getAllDescendantEntities(parentId) {
 /**
  * List all folders with their child counts and hierarchy paths.
  *
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<{ folders: Array, total: number }>}
  */
-export async function listAllFolders() {
+export async function listAllFolders(userId = null) {
+  const where = { type: 'FOLDER', archivedAt: null };
+  if (userId) where.userId = userId;
+
   const folders = await prisma.note.findMany({
-    where: { type: 'FOLDER', archivedAt: null },
+    where,
     select: {
       id: true,
       title: true,
@@ -99,16 +121,19 @@ export async function listAllFolders() {
     orderBy: { title: 'asc' },
   });
 
+  const countWhere = { archivedAt: null };
+  if (userId) countWhere.userId = userId;
+
   const childCounts = await prisma.note.groupBy({
     by: ['parentId'],
-    where: { archivedAt: null },
+    where: countWhere,
     _count: { id: true },
   });
   const countMap = new Map(childCounts.map((c) => [c.parentId, c._count.id]));
 
   const enrichedFolders = [];
   for (const folder of folders) {
-    const ancestors = await getFolderAncestors(folder.id);
+    const ancestors = await getFolderAncestors(folder.id, userId);
     const path = ['Root', ...ancestors.map((a) => a.title), folder.title].join(' > ');
 
     enrichedFolders.push({
@@ -132,18 +157,22 @@ export async function listAllFolders() {
  * @param {string} [options.folderId='root'] - Folder UUID or 'root'
  * @param {string} [options.relationshipType] - Filter by specific relationship type
  * @param {boolean} [options.includeHierarchy=false] - Whether to generate hierarchy edges
+ * @param {boolean} [options.includeKnowledge=true] - Whether to include semantic knowledge edges
  * @param {boolean} [options.includeExternal=true] - Whether to include external endpoint nodes
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<{ scope: Object, nodes: Array, edges: Array, meta: Object }>}
  */
-export async function getFolderGraphData(options = {}) {
+export async function getFolderGraphData(options = {}, userId = null) {
   const {
     folderId = 'root',
     relationshipType,
     includeHierarchy = false,
+    includeKnowledge = true,
     includeExternal = true,
   } = options;
 
-  const shouldIncludeExternal = folderId !== 'root' && Boolean(includeExternal);
+  const shouldIncludeKnowledge = Boolean(includeKnowledge);
+  const shouldIncludeExternal = folderId !== 'root' && Boolean(includeExternal) && shouldIncludeKnowledge;
 
   let currentFolder = null;
   let breadcrumbs = [{ id: 'root', title: 'Root' }];
@@ -152,11 +181,14 @@ export async function getFolderGraphData(options = {}) {
 
   if (folderId === 'root' || !folderId) {
     // 1. Root Workspace Graph: top-level items
+    const rootWhere = {
+      parentId: null,
+      archivedAt: null,
+    };
+    if (userId) rootWhere.userId = userId;
+
     descendants = await prisma.note.findMany({
-      where: {
-        parentId: null,
-        archivedAt: null,
-      },
+      where: rootWhere,
       select: NOTE_SELECT_FIELDS,
       orderBy: [{ type: 'desc' }, { title: 'asc' }],
     });
@@ -164,8 +196,10 @@ export async function getFolderGraphData(options = {}) {
     scopeNodes = descendants;
   } else {
     // 2. Folder-Centric Graph
-    currentFolder = await prisma.note.findUnique({
-      where: { id: folderId },
+    const folderWhere = { id: folderId };
+    if (userId) folderWhere.userId = userId;
+
+    currentFolder = await findNoteRecord(folderWhere, {
       select: NOTE_SELECT_FIELDS,
     });
 
@@ -177,7 +211,7 @@ export async function getFolderGraphData(options = {}) {
       throw new AppError(`Entity with ID ${folderId} is a NOTE, not a FOLDER`, 400);
     }
 
-    const ancestors = await getFolderAncestors(folderId);
+    const ancestors = await getFolderAncestors(folderId, userId);
     breadcrumbs = [
       { id: 'root', title: 'Root' },
       ...ancestors,
@@ -185,11 +219,14 @@ export async function getFolderGraphData(options = {}) {
     ];
 
     // Fetch direct children under this folder (immediate notes and subfolders)
+    const childWhere = {
+      parentId: folderId,
+      archivedAt: null,
+    };
+    if (userId) childWhere.userId = userId;
+
     descendants = await prisma.note.findMany({
-      where: {
-        parentId: folderId,
-        archivedAt: null,
-      },
+      where: childWhere,
       select: NOTE_SELECT_FIELDS,
       orderBy: [{ type: 'desc' }, { title: 'asc' }],
     });
@@ -201,14 +238,17 @@ export async function getFolderGraphData(options = {}) {
   const scopeNodeIds = new Set(scopeNodes.map((n) => n.id));
 
   // 3. Query all relationships connected to any node in scope
+  const relWhere = {
+    OR: [
+      { sourceNoteId: { in: Array.from(scopeNodeIds) } },
+      { targetNoteId: { in: Array.from(scopeNodeIds) } },
+    ],
+  };
+  if (userId) relWhere.userId = userId;
+  if (relationshipType) relWhere.relationshipType = relationshipType;
+
   const allConnectedRelationships = await prisma.noteRelationship.findMany({
-    where: {
-      OR: [
-        { sourceNoteId: { in: Array.from(scopeNodeIds) } },
-        { targetNoteId: { in: Array.from(scopeNodeIds) } },
-      ],
-      ...(relationshipType ? { relationshipType } : {}),
-    },
+    where: relWhere,
     select: {
       id: true,
       sourceNoteId: true,
@@ -219,12 +259,15 @@ export async function getFolderGraphData(options = {}) {
   });
 
   // 4. Calculate child counts for folders and external connection counts
+  const childGroupWhere = {
+    parentId: { in: Array.from(scopeNodeIds) },
+    archivedAt: null,
+  };
+  if (userId) childGroupWhere.userId = userId;
+
   const childCounts = await prisma.note.groupBy({
     by: ['parentId'],
-    where: {
-      parentId: { in: Array.from(scopeNodeIds) },
-      archivedAt: null,
-    },
+    where: childGroupWhere,
     _count: { id: true },
   });
   const childCountMap = new Map(childCounts.map((c) => [c.parentId, c._count.id]));
@@ -244,15 +287,17 @@ export async function getFolderGraphData(options = {}) {
     const targetInScope = scopeNodeIds.has(rel.targetNoteId);
 
     if (sourceInScope && targetInScope) {
-      internalEdges.push({
-        id: rel.id,
-        source: rel.sourceNoteId,
-        target: rel.targetNoteId,
-        relationshipType: rel.relationshipType,
-        description: rel.description,
-        isHierarchy: false,
-        isExternal: false,
-      });
+      if (shouldIncludeKnowledge) {
+        internalEdges.push({
+          id: rel.id,
+          source: rel.sourceNoteId,
+          target: rel.targetNoteId,
+          relationshipType: rel.relationshipType,
+          description: rel.description,
+          isHierarchy: false,
+          isExternal: false,
+        });
+      }
     } else {
       if (sourceInScope) {
         externalCountMap.set(rel.sourceNoteId, (externalCountMap.get(rel.sourceNoteId) || 0) + 1);
@@ -290,11 +335,14 @@ export async function getFolderGraphData(options = {}) {
   // 6. Fetch external nodes if requested and present
   let externalNodes = [];
   if (shouldIncludeExternal && externalNodeIds.size > 0) {
+    const extWhere = {
+      id: { in: Array.from(externalNodeIds) },
+      archivedAt: null,
+    };
+    if (userId) extWhere.userId = userId;
+
     const externalRecords = await prisma.note.findMany({
-      where: {
-        id: { in: Array.from(externalNodeIds) },
-        archivedAt: null,
-      },
+      where: extWhere,
       select: {
         id: true,
         title: true,
@@ -402,8 +450,16 @@ export async function getFolderGraphData(options = {}) {
  * @param {boolean} [options.includeHierarchy=false] - Whether to include parent-child hierarchy edges
  * @returns {Promise<{ nodes: Array, edges: Array, totalNodes: number, totalEdges: number }>}
  */
-export async function getGraphData(options = {}) {
-  const { rootId, folderId, depth = 1, relationshipType, includeHierarchy = false } = options;
+export async function getGraphData(options = {}, userId = null) {
+  const {
+    rootId,
+    folderId,
+    depth = 1,
+    relationshipType,
+    includeHierarchy = false,
+    includeKnowledge = true,
+    includeExternal = true,
+  } = options;
 
   // If folderId is explicitly provided, delegate to folder-scoped graph service
   if (folderId) {
@@ -411,12 +467,17 @@ export async function getGraphData(options = {}) {
       folderId,
       relationshipType,
       includeHierarchy,
-    });
+      includeKnowledge,
+      includeExternal,
+    }, userId);
   }
 
   // 1. Fetch non-archived notes
+  const noteWhere = { archivedAt: null };
+  if (userId) noteWhere.userId = userId;
+
   const notes = await prisma.note.findMany({
-    where: { archivedAt: null },
+    where: noteWhere,
     select: {
       id: true,
       title: true,
@@ -438,6 +499,7 @@ export async function getGraphData(options = {}) {
 
   // 2. Fetch relationships
   const relWhere = {};
+  if (userId) relWhere.userId = userId;
   if (relationshipType) {
     relWhere.relationshipType = relationshipType;
   }

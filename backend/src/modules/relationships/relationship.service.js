@@ -1,8 +1,11 @@
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middlewares/errorHandler.js';
 
+export const DEFAULT_WORKSPACE_USER_ID = '00000000-0000-4000-8000-000000000000';
+
 /**
  * Service handling business logic and Prisma operations for note relationships.
+ * Enforces authenticated user ownership and cross-user isolation.
  */
 
 const NOTE_SELECT_FIELDS = {
@@ -12,18 +15,44 @@ const NOTE_SELECT_FIELDS = {
   updatedAt: true,
 };
 
+async function findNoteRecord(where, options = {}) {
+  if (typeof prisma.note?.findFirst === 'function') {
+    return prisma.note.findFirst({ where, ...options });
+  }
+  if (typeof prisma.note?.findUnique === 'function' && where.id) {
+    const record = await prisma.note.findUnique({ where: { id: where.id }, ...options });
+    if (record && where.userId && record.userId && record.userId !== where.userId) {
+      return null;
+    }
+    return record;
+  }
+  return null;
+}
+
+async function findRelationshipRecord(where, options = {}) {
+  if (typeof prisma.noteRelationship?.findFirst === 'function') {
+    return prisma.noteRelationship.findFirst({ where, ...options });
+  }
+  if (typeof prisma.noteRelationship?.findUnique === 'function' && where.id) {
+    const record = await prisma.noteRelationship.findUnique({ where: { id: where.id }, ...options });
+    if (record && where.userId && record.userId && record.userId !== where.userId) {
+      return null;
+    }
+    return record;
+  }
+  return null;
+}
+
 /**
  * Create a directional relationship between two notes.
  *
  * @param {Object} data - Relationship payload
- * @param {string} data.sourceNoteId - Source Note UUID
- * @param {string} data.targetNoteId - Target Note UUID
- * @param {string} data.relationshipType - Enum value from RelationshipType
- * @param {string} [data.description] - Optional contextual note
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Object>} Created relationship with source and target note details
- * @throws {AppError} 400 if self-referencing, 404 if either note not found, 409 if duplicate
+ * @throws {AppError} 400 if self-referencing, 404 if either note not found, 409 if duplicate, 403 if cross-user
  */
-export async function createRelationship(data) {
+export async function createRelationship(data, userId = null) {
+  const effectiveUserId = userId || data.userId || DEFAULT_WORKSPACE_USER_ID;
   const sourceNoteId = data.sourceNoteId || data.sourceId;
   const targetNoteId = data.targetNoteId || data.targetId;
   const { relationshipType, description = null, label = null } = data;
@@ -32,22 +61,31 @@ export async function createRelationship(data) {
     throw new AppError('A note cannot have a relationship with itself', 400);
   }
 
-  // Verify source note exists
-  const sourceNote = await prisma.note.findUnique({
-    where: { id: sourceNoteId },
-    select: { id: true, type: true },
+  // Verify source note exists and belongs to the user
+  const sourceWhere = { id: sourceNoteId };
+  if (userId) sourceWhere.userId = userId;
+
+  const sourceNote = await findNoteRecord(sourceWhere, {
+    select: { id: true, type: true, userId: true },
   });
   if (!sourceNote) {
     throw new AppError(`Source note with ID ${sourceNoteId} not found`, 404);
   }
 
-  // Verify target note exists
-  const targetNote = await prisma.note.findUnique({
-    where: { id: targetNoteId },
-    select: { id: true, type: true },
+  // Verify target note exists and belongs to the user
+  const targetWhere = { id: targetNoteId };
+  if (userId) targetWhere.userId = userId;
+
+  const targetNote = await findNoteRecord(targetWhere, {
+    select: { id: true, type: true, userId: true },
   });
   if (!targetNote) {
     throw new AppError(`Target note with ID ${targetNoteId} not found`, 404);
+  }
+
+  // Prevent cross-user relationships
+  if (sourceNote.userId && targetNote.userId && sourceNote.userId !== targetNote.userId) {
+    throw new AppError('Cross-user relationships are not permitted', 403);
   }
 
   const effectiveLabel = label || description || null;
@@ -56,6 +94,7 @@ export async function createRelationship(data) {
   try {
     const relationship = await prisma.noteRelationship.create({
       data: {
+        userId: effectiveUserId,
         sourceNoteId,
         sourceType: sourceNote.type,
         targetNoteId,
@@ -88,17 +127,18 @@ export async function createRelationship(data) {
  *
  * @param {string} noteId - Note UUID
  * @param {Object} [options] - Filter options
- * @param {'both'|'outgoing'|'incoming'} [options.direction='both'] - Direction filter
- * @param {string} [options.type] - RelationshipType filter
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Object>} Relationships grouped by direction
  * @throws {AppError} 404 if note not found
  */
-export async function getRelationshipsForNote(noteId, options = {}) {
+export async function getRelationshipsForNote(noteId, options = {}, userId = null) {
   const { direction = 'both', type } = options;
 
-  // Verify note exists
-  const note = await prisma.note.findUnique({
-    where: { id: noteId },
+  // Verify note exists and belongs to user
+  const noteWhere = { id: noteId };
+  if (userId) noteWhere.userId = userId;
+
+  const note = await findNoteRecord(noteWhere, {
     select: { id: true, title: true, type: true },
   });
 
@@ -109,11 +149,13 @@ export async function getRelationshipsForNote(noteId, options = {}) {
   const outgoingFilter = {
     sourceNoteId: noteId,
     ...(type ? { relationshipType: type } : {}),
+    ...(userId ? { userId } : {}),
   };
 
   const incomingFilter = {
     targetNoteId: noteId,
     ...(type ? { relationshipType: type } : {}),
+    ...(userId ? { userId } : {}),
   };
 
   let outgoing = [];
@@ -149,15 +191,17 @@ export async function getRelationshipsForNote(noteId, options = {}) {
 }
 
 /**
- * List relationships with optional filters (e.g. for knowledge graph rendering).
+ * List relationships with optional filters.
  *
  * @param {Object} [filter={}] - Query filters
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Array>} List of relationships
  */
-export async function listRelationships(filter = {}) {
+export async function listRelationships(filter = {}, userId = null) {
   const { sourceNoteId, targetNoteId, relationshipType } = filter;
 
   const where = {};
+  if (userId) where.userId = userId;
   if (sourceNoteId) where.sourceNoteId = sourceNoteId;
   if (targetNoteId) where.targetNoteId = targetNoteId;
   if (relationshipType) where.relationshipType = relationshipType;
@@ -176,12 +220,15 @@ export async function listRelationships(filter = {}) {
  * Get a single relationship by UUID.
  *
  * @param {string} id - Relationship UUID
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Object>} Relationship record
  * @throws {AppError} 404 if not found
  */
-export async function getRelationshipById(id) {
-  const relationship = await prisma.noteRelationship.findUnique({
-    where: { id },
+export async function getRelationshipById(id, userId = null) {
+  const where = { id };
+  if (userId) where.userId = userId;
+
+  const relationship = await findRelationshipRecord(where, {
     include: {
       sourceNote: { select: NOTE_SELECT_FIELDS },
       targetNote: { select: NOTE_SELECT_FIELDS },
@@ -200,13 +247,14 @@ export async function getRelationshipById(id) {
  *
  * @param {string} id - Relationship UUID
  * @param {Object} data - Update payload
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<Object>} Updated relationship
- * @throws {AppError} 404 if not found, 409 if changing type to an existing duplicate
  */
-export async function updateRelationship(id, data) {
-  const existing = await prisma.noteRelationship.findUnique({
-    where: { id },
-  });
+export async function updateRelationship(id, data, userId = null) {
+  const where = { id };
+  if (userId) where.userId = userId;
+
+  const existing = await findRelationshipRecord(where);
 
   if (!existing) {
     throw new AppError(`Relationship with ID ${id} not found`, 404);
@@ -257,12 +305,15 @@ export async function updateRelationship(id, data) {
  * Delete a relationship by UUID.
  *
  * @param {string} id - Relationship UUID
+ * @param {string} [userId] - Authenticated user UUID
  * @returns {Promise<void>}
  * @throws {AppError} 404 if not found
  */
-export async function deleteRelationship(id) {
-  const relationship = await prisma.noteRelationship.findUnique({
-    where: { id },
+export async function deleteRelationship(id, userId = null) {
+  const where = { id };
+  if (userId) where.userId = userId;
+
+  const relationship = await findRelationshipRecord(where, {
     select: { id: true },
   });
 

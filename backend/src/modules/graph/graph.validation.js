@@ -31,6 +31,18 @@ export const getGraphValidation = [
     .isBoolean()
     .withMessage('includeHierarchy must be a boolean')
     .toBoolean(),
+
+  query('includeKnowledge')
+    .optional()
+    .isBoolean()
+    .withMessage('includeKnowledge must be a boolean')
+    .toBoolean(),
+
+  query('includeExternal')
+    .optional()
+    .isBoolean()
+    .withMessage('includeExternal must be a boolean')
+    .toBoolean(),
 ];
 
 export const getFolderGraphValidation = [
@@ -49,6 +61,18 @@ export const getFolderGraphValidation = [
     .optional()
     .isBoolean()
     .withMessage('includeHierarchy must be a boolean')
+    .toBoolean(),
+
+  query('includeKnowledge')
+    .optional()
+    .isBoolean()
+    .withMessage('includeKnowledge must be a boolean')
+    .toBoolean(),
+
+  query('includeExternal')
+    .optional()
+    .isBoolean()
+    .withMessage('includeExternal must be a boolean')
     .toBoolean(),
 ];
 
