@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { AUTO_SAVE_STATUS } from '../constants/index.js';
 
-const DEFAULT_DEBOUNCE_DELAY_MS = 1000;
+const DEFAULT_DEBOUNCE_DELAY_MS = 600;
 
 /**
  * Robust debounced background auto-save hook.
@@ -61,6 +61,8 @@ export function useAutoSave(onSave, delayMs = DEFAULT_DEBOUNCE_DELAY_MS) {
       // Restore unsaved data back to pending if no newer data arrived
       if (!pendingDataRef.current) {
         pendingDataRef.current = dataToPersist;
+      } else {
+        pendingDataRef.current = { ...dataToPersist, ...pendingDataRef.current };
       }
       isSavingRef.current = false;
       inFlightDataRef.current = null;
@@ -70,7 +72,10 @@ export function useAutoSave(onSave, delayMs = DEFAULT_DEBOUNCE_DELAY_MS) {
 
   const triggerSave = useCallback(
     (data) => {
-      pendingDataRef.current = data;
+      pendingDataRef.current = {
+        ...(pendingDataRef.current || {}),
+        ...data,
+      };
       setStatus(AUTO_SAVE_STATUS.UNSAVED);
 
       if (timerRef.current) {
@@ -80,6 +85,17 @@ export function useAutoSave(onSave, delayMs = DEFAULT_DEBOUNCE_DELAY_MS) {
     },
     [delayMs, performSave]
   );
+
+  const cancelSave = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    pendingDataRef.current = null;
+    inFlightDataRef.current = null;
+    isSavingRef.current = false;
+    setStatus(AUTO_SAVE_STATUS.SAVED);
+  }, []);
 
   const flushSave = useCallback(async () => {
     if (timerRef.current) {
@@ -125,5 +141,6 @@ export function useAutoSave(onSave, delayMs = DEFAULT_DEBOUNCE_DELAY_MS) {
     triggerSave,
     flushSave,
     retrySave,
+    cancelSave,
   };
 }

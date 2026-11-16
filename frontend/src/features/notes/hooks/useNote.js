@@ -55,6 +55,15 @@ export function useNote(noteId) {
           };
         });
 
+        // Notify other components (sidebar hierarchy tree, breadcrumbs) of title update
+        if (updates.title !== undefined) {
+          window.dispatchEvent(
+            new CustomEvent('note:updated', {
+              detail: { id: idToSave, title: updates.title },
+            })
+          );
+        }
+
         return response.data;
       } catch (err) {
         setError(err.message || 'Failed to save note');

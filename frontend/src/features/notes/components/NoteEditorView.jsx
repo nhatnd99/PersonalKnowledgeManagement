@@ -38,54 +38,78 @@ export function NoteEditorView() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const activeNoteIdRef = useRef(noteId);
+  const loadedNoteIdRef = useRef(null);
+  const lastSavedTitleRef = useRef('');
   const titleRef = useRef(title);
   const contentRef = useRef(content);
 
   // Auto-save hook saving to the exact note ID that generated the edits
-  const { status, lastSavedAt, triggerSave, flushSave, retrySave } = useAutoSave(
+  const { status, lastSavedAt, triggerSave, flushSave, retrySave, cancelSave } = useAutoSave(
     async (data) => {
-      if (activeNoteIdRef.current) {
-        await saveNote(data, activeNoteIdRef.current);
+      const targetId = activeNoteIdRef.current;
+      if (targetId) {
+        const updated = await saveNote(data, targetId);
+        if (data.title !== undefined && targetId === activeNoteIdRef.current) {
+          lastSavedTitleRef.current = updated?.title ?? data.title;
+        }
       }
     },
-    1000
+    600
   );
 
   // Sync state when loaded note changes or navigation to different note occurs
   useEffect(() => {
-    if (note && note.id !== activeNoteIdRef.current) {
+    if (note && note.id === noteId && note.id !== loadedNoteIdRef.current) {
+      loadedNoteIdRef.current = note.id;
       activeNoteIdRef.current = note.id;
-      setTitle(note.title || '');
+      const initialTitle = note.title || '';
+      setTitle(initialTitle);
+      titleRef.current = initialTitle;
+      lastSavedTitleRef.current = initialTitle;
       setContent(note.content || null);
-      titleRef.current = note.title || '';
-      contentRef.current = note.content || null;
-    } else if (note && !activeNoteIdRef.current) {
-      activeNoteIdRef.current = note.id;
-      setTitle(note.title || '');
-      setContent(note.content || null);
-      titleRef.current = note.title || '';
       contentRef.current = note.content || null;
     }
-  }, [note]);
+  }, [note, noteId]);
 
-  // Flush any pending save on navigation or unmount
+  // Flush any pending save on navigation or unmount, and clean up for new note
   useEffect(() => {
+    activeNoteIdRef.current = noteId;
     return () => {
       flushSave();
+      cancelSave();
+      loadedNoteIdRef.current = null;
+      setTitle('');
+      titleRef.current = '';
+      lastSavedTitleRef.current = '';
     };
-  }, [noteId, flushSave]);
+  }, [noteId, flushSave, cancelSave]);
 
   const handleTitleChange = (e) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
     titleRef.current = newTitle;
-    triggerSave({ title: newTitle, content: contentRef.current });
+
+    // Trigger auto-save only if the title actually changed from last saved title
+    if (newTitle !== lastSavedTitleRef.current) {
+      triggerSave({ title: newTitle });
+    }
+  };
+
+  const handleTitleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Move focus into the rich text editor surface
+      const editorEl = document.querySelector('.ProseMirror');
+      if (editorEl) {
+        editorEl.focus();
+      }
+    }
   };
 
   const handleContentChange = useCallback(
     (newContentJson) => {
       contentRef.current = newContentJson;
-      triggerSave({ title: titleRef.current, content: newContentJson });
+      triggerSave({ content: newContentJson });
     },
     [triggerSave]
   );
@@ -260,8 +284,11 @@ export function NoteEditorView() {
             type="text"
             value={title}
             onChange={handleTitleChange}
+            onKeyDown={handleTitleKeyDown}
             placeholder="Untitled Note"
-            className="w-full text-2xl sm:text-3xl font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 mb-3"
+            maxLength={500}
+            className="w-full text-2xl sm:text-3xl font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 mb-3 px-1 py-1 rounded-md focus:bg-muted/20 focus:ring-1 focus:ring-primary/30 transition-colors"
+            aria-label="Note title"
           />
 
           {/* Interactive Tag Chips Bar */}
