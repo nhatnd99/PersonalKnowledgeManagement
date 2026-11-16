@@ -10,6 +10,9 @@ import {
   Network,
   Tag,
   Link as LinkIcon,
+  Edit2,
+  FolderInput,
+  Trash2,
 } from 'lucide-react';
 
 /**
@@ -24,6 +27,9 @@ export function GraphNodeDrawer({
   onOpenNote,
   onOpenFolderGraph,
   onConnectNode,
+  onRename,
+  onMoveTo,
+  onDelete,
 }) {
   if (!selectedNode) return null;
 
@@ -218,6 +224,41 @@ export function GraphNodeDrawer({
           <Network className="h-3.5 w-3.5 text-primary" />
           <span>Connect to Another Item</span>
         </button>
+
+        <div className="grid grid-cols-2 gap-2">
+          {onRename && (
+            <button
+              type="button"
+              onClick={() => onRename(selectedNode)}
+              className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border bg-background text-foreground font-medium hover:bg-muted transition-colors text-xs"
+            >
+              <Edit2 className="h-3 w-3 text-muted-foreground" />
+              <span>Rename</span>
+            </button>
+          )}
+
+          {onMoveTo && (
+            <button
+              type="button"
+              onClick={() => onMoveTo(selectedNode)}
+              className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border bg-background text-foreground font-medium hover:bg-muted transition-colors text-xs"
+            >
+              <FolderInput className="h-3 w-3 text-indigo-500" />
+              <span>Move to...</span>
+            </button>
+          )}
+        </div>
+
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(selectedNode)}
+            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-destructive hover:bg-destructive/10 transition-colors text-xs font-medium"
+          >
+            <Trash2 className="h-3 w-3" />
+            <span>Delete Permanently</span>
+          </button>
+        )}
       </div>
     </aside>
   );
@@ -231,4 +272,7 @@ GraphNodeDrawer.propTypes = {
   onOpenNote: PropTypes.func.isRequired,
   onOpenFolderGraph: PropTypes.func.isRequired,
   onConnectNode: PropTypes.func.isRequired,
+  onRename: PropTypes.func,
+  onMoveTo: PropTypes.func,
+  onDelete: PropTypes.func,
 };

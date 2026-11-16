@@ -9,8 +9,12 @@ import {
   RotateCw,
   Plus,
   Maximize2,
+  Minimize2,
   Home,
   FolderTree,
+  Network,
+  Globe,
+  Focus,
 } from 'lucide-react';
 
 const RELATIONSHIP_FILTERS = [
@@ -33,6 +37,12 @@ export function GraphToolbar({
   onRelationshipTypeChange,
   includeHierarchy,
   onToggleHierarchy,
+  includeKnowledge = true,
+  onToggleKnowledge,
+  includeExternal = true,
+  onToggleExternal,
+  isFullscreen = false,
+  onToggleFullscreen,
   nodeCount,
   edgeCount,
   onRefresh,
@@ -132,20 +142,22 @@ export function GraphToolbar({
         </nav>
 
         {/* Stats */}
-        <div className="ml-1 sm:ml-2 pl-1.5 sm:pl-2 border-l border-border text-[10px] sm:text-[11px] text-muted-foreground">
+        <div className="ml-1 sm:ml-2 pl-1.5 sm:pl-2 border-l border-border text-[10px] sm:text-[11px] text-muted-foreground whitespace-nowrap">
           <span>{nodeCount} {nodeCount === 1 ? 'node' : 'nodes'}, {edgeCount} {edgeCount === 1 ? 'edge' : 'edges'}</span>
         </div>
       </div>
 
       {/* Right side: Controls & Tools */}
-      <div className="flex items-center gap-1 sm:gap-2 rounded-xl border border-border bg-card/95 p-1 sm:p-1.5 shadow-lg backdrop-blur-md text-xs pointer-events-auto">
+      <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 rounded-xl border border-border bg-card/95 p-1 sm:p-1.5 shadow-lg backdrop-blur-md text-xs pointer-events-auto">
         {/* Relationship Type Filter */}
         <div className="flex items-center gap-1 px-1">
           <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <select
             value={relationshipType}
             onChange={(e) => onRelationshipTypeChange(e.target.value)}
-            className="rounded-md border border-input bg-background px-1.5 sm:px-2 py-1 text-[11px] sm:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring max-w-[90px] sm:max-w-none truncate"
+            disabled={!includeKnowledge}
+            className="rounded-md border border-input bg-background px-1.5 sm:px-2 py-1 text-[11px] sm:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring max-w-[95px] sm:max-w-none truncate disabled:opacity-50"
+            title="Filter by relationship type"
           >
             {RELATIONSHIP_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -155,26 +167,61 @@ export function GraphToolbar({
           </select>
         </div>
 
+        {/* Knowledge Links Toggle */}
+        {onToggleKnowledge && (
+          <button
+            type="button"
+            onClick={onToggleKnowledge}
+            title={includeKnowledge ? 'Hide knowledge relationships' : 'Show knowledge relationships'}
+            className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-md border text-xs transition-colors ${
+              includeKnowledge
+                ? 'bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400 font-medium'
+                : 'bg-background border-border text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <Network className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">Knowledge Links</span>
+          </button>
+        )}
+
         {/* Include Hierarchy toggle */}
         <button
           type="button"
           onClick={onToggleHierarchy}
-          title="Toggle direct parent-to-child hierarchy links"
-          className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md border text-xs transition-colors ${
+          title={includeHierarchy ? 'Hide hierarchy links' : 'Show direct parent-child hierarchy links'}
+          className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-md border text-xs transition-colors ${
             includeHierarchy
-              ? 'bg-primary/10 border-primary text-primary font-medium'
+              ? 'bg-purple-500/10 border-purple-500 text-purple-600 dark:text-purple-400 font-medium'
               : 'bg-background border-border text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
           <Layers className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Hierarchy Links</span>
+          <span className="hidden lg:inline">Hierarchy</span>
         </button>
+
+        {/* External Nodes toggle */}
+        {!isRoot && onToggleExternal && (
+          <button
+            type="button"
+            onClick={onToggleExternal}
+            title={includeExternal ? 'Hide external connected nodes' : 'Show external connected nodes'}
+            className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-md border text-xs transition-colors ${
+              includeExternal
+                ? 'bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-400 font-medium'
+                : 'bg-background border-border text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            <span className="hidden xl:inline">External Nodes</span>
+          </button>
+        )}
 
         {/* Connect Nodes Button */}
         {onOpenConnectModal && (
           <button
             type="button"
             onClick={onOpenConnectModal}
+            title="Create semantic relationship between items"
             className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -187,10 +234,26 @@ export function GraphToolbar({
           <button
             type="button"
             onClick={onFitView}
-            title="Fit graph view"
+            title="Fit graph to view"
             className="p-1 sm:p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Maximize2 className="h-3.5 w-3.5" />
+            <Focus className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {/* Fullscreen Toggle */}
+        {onToggleFullscreen && (
+          <button
+            type="button"
+            onClick={onToggleFullscreen}
+            title={isFullscreen ? 'Exit full screen' : 'View full screen'}
+            className="p-1 sm:p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-3.5 w-3.5 text-primary" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5" />
+            )}
           </button>
         )}
 
@@ -209,6 +272,38 @@ export function GraphToolbar({
     </div>
   );
 }
+
+GraphToolbar.propTypes = {
+  scope: PropTypes.shape({
+    id: PropTypes.string,
+    title: PropTypes.string,
+    type: PropTypes.string,
+  }),
+  breadcrumbs: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string,
+      title: PropTypes.string,
+    })
+  ),
+  onNavigateBreadcrumb: PropTypes.func.isRequired,
+  relationshipType: PropTypes.string.isRequired,
+  onRelationshipTypeChange: PropTypes.func.isRequired,
+  includeHierarchy: PropTypes.bool.isRequired,
+  onToggleHierarchy: PropTypes.func.isRequired,
+  includeKnowledge: PropTypes.bool,
+  onToggleKnowledge: PropTypes.func,
+  includeExternal: PropTypes.bool,
+  onToggleExternal: PropTypes.func,
+  isFullscreen: PropTypes.bool,
+  onToggleFullscreen: PropTypes.func,
+  nodeCount: PropTypes.number.isRequired,
+  edgeCount: PropTypes.number.isRequired,
+  onRefresh: PropTypes.func,
+  onFitView: PropTypes.func,
+  onOpenConnectModal: PropTypes.func,
+  foldersList: PropTypes.array,
+  onBackToFolderSelection: PropTypes.func,
+};
 
 GraphToolbar.propTypes = {
   scope: PropTypes.shape({

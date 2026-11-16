@@ -60,6 +60,30 @@ export function useHierarchy() {
     loadTree();
   }, [loadTree]);
 
+  // Synchronize note title updates in real-time across the tree
+  useEffect(() => {
+    const handleNoteUpdated = (e) => {
+      const { id, title } = e.detail || {};
+      if (!id) return;
+      setTreeData((prevTree) => {
+        const updateTitle = (nodes) =>
+          nodes.map((n) => {
+            if (n.id === id) {
+              return { ...n, title: title || '' };
+            }
+            if (n.children && n.children.length > 0) {
+              return { ...n, children: updateTitle(n.children) };
+            }
+            return n;
+          });
+        return updateTitle(prevTree);
+      });
+    };
+
+    window.addEventListener('note:updated', handleNoteUpdated);
+    return () => window.removeEventListener('note:updated', handleNoteUpdated);
+  }, []);
+
   const toggleExpand = useCallback((nodeId) => {
     setExpandedNodeIds((prev) => {
       const next = new Set(prev);

@@ -20,12 +20,16 @@ export const graphService = {
    * @param {Object} [options={}]
    * @param {string} [options.relationshipType] - Filter relationship type
    * @param {boolean} [options.includeHierarchy] - Include parent-child hierarchy edges
+   * @param {boolean} [options.includeKnowledge] - Include semantic knowledge edges
+   * @param {boolean} [options.includeExternal] - Include external endpoint nodes
    * @returns {Promise<{ scope: Object, nodes: Array, edges: Array, meta: Object }>}
    */
   async getRootGraph(options = {}) {
     const params = new URLSearchParams();
     if (options.relationshipType) params.append('relationshipType', options.relationshipType);
-    if (options.includeHierarchy) params.append('includeHierarchy', 'true');
+    if (options.includeHierarchy !== undefined) params.append('includeHierarchy', String(options.includeHierarchy));
+    if (options.includeKnowledge !== undefined) params.append('includeKnowledge', String(options.includeKnowledge));
+    if (options.includeExternal !== undefined) params.append('includeExternal', String(options.includeExternal));
 
     const queryString = params.toString() ? `?${params.toString()}` : '';
     const response = await apiClient.get(`/graph/root${queryString}`);
@@ -39,6 +43,8 @@ export const graphService = {
    * @param {Object} [options={}]
    * @param {string} [options.relationshipType] - Filter relationship type
    * @param {boolean} [options.includeHierarchy] - Include parent-child hierarchy edges
+   * @param {boolean} [options.includeKnowledge] - Include semantic knowledge edges
+   * @param {boolean} [options.includeExternal] - Include external endpoint nodes
    * @returns {Promise<{ scope: Object, nodes: Array, edges: Array, meta: Object }>}
    */
   async getFolderGraph(folderId, options = {}) {
@@ -48,7 +54,9 @@ export const graphService = {
 
     const params = new URLSearchParams();
     if (options.relationshipType) params.append('relationshipType', options.relationshipType);
-    if (options.includeHierarchy) params.append('includeHierarchy', 'true');
+    if (options.includeHierarchy !== undefined) params.append('includeHierarchy', String(options.includeHierarchy));
+    if (options.includeKnowledge !== undefined) params.append('includeKnowledge', String(options.includeKnowledge));
+    if (options.includeExternal !== undefined) params.append('includeExternal', String(options.includeExternal));
 
     const queryString = params.toString() ? `?${params.toString()}` : '';
     const response = await apiClient.get(`/graph/folders/${folderId}${queryString}`);
@@ -64,6 +72,8 @@ export const graphService = {
    * @param {number} [options.depth] - Traversal depth
    * @param {string} [options.relationshipType] - Filter relationship type
    * @param {boolean} [options.includeHierarchy] - Include parent-child hierarchy edges
+   * @param {boolean} [options.includeKnowledge] - Include semantic knowledge edges
+   * @param {boolean} [options.includeExternal] - Include external endpoint nodes
    * @returns {Promise<{ nodes: Array, edges: Array, totalNodes: number, totalEdges: number }>}
    */
   async getGraph(options = {}) {
@@ -72,7 +82,9 @@ export const graphService = {
     if (options.rootId) params.append('rootId', options.rootId);
     if (options.depth) params.append('depth', options.depth);
     if (options.relationshipType) params.append('relationshipType', options.relationshipType);
-    if (options.includeHierarchy) params.append('includeHierarchy', 'true');
+    if (options.includeHierarchy !== undefined) params.append('includeHierarchy', String(options.includeHierarchy));
+    if (options.includeKnowledge !== undefined) params.append('includeKnowledge', String(options.includeKnowledge));
+    if (options.includeExternal !== undefined) params.append('includeExternal', String(options.includeExternal));
 
     const queryString = params.toString() ? `?${params.toString()}` : '';
     const response = await apiClient.get(`/graph${queryString}`);

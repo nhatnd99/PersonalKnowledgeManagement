@@ -7,6 +7,7 @@ import * as noteService from '../../notes/services/noteService.js';
 import { NOTE_TYPES } from '../../../constants/index.js';
 import { DeleteConfirmModal } from '../../notes/components/DeleteConfirmModal.jsx';
 import { MoveToModal } from './MoveToModal.jsx';
+import { RenameModal } from '../../notes/components/RenameModal.jsx';
 
 /**
  * HierarchyTree: Main component rendering full nested outline of notes and folders.
@@ -25,6 +26,7 @@ export function HierarchyTree() {
   const navigate = useNavigate();
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [moveTarget, setMoveTarget] = useState(null);
+  const [renameTarget, setRenameTarget] = useState(null);
 
   const handleCreateChild = async (parentId, type = NOTE_TYPES.NOTE) => {
     try {
@@ -107,6 +109,7 @@ export function HierarchyTree() {
               onCreateChild={handleCreateChild}
               onDeleteNote={handleDeleteNote}
               onOpenMoveModal={setMoveTarget}
+              onOpenRenameModal={setRenameTarget}
             />
           ))
         )}
@@ -126,6 +129,15 @@ export function HierarchyTree() {
         targetNode={moveTarget}
         onMove={async (id, parentId) => {
           await moveNoteToParent(id, parentId);
+          await reload();
+        }}
+      />
+
+      <RenameModal
+        isOpen={Boolean(renameTarget)}
+        onClose={() => setRenameTarget(null)}
+        target={renameTarget}
+        onRenamed={async () => {
           await reload();
         }}
       />

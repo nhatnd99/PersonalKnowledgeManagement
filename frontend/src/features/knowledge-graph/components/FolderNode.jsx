@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Handle, Position } from 'reactflow';
-import { Folder, FolderOpen, ArrowRight, Network } from 'lucide-react';
+import { Folder, FolderOpen, ArrowRight, Network, MoreHorizontal } from 'lucide-react';
 
 /**
  * Custom React Flow node representing an organizational folder.
@@ -27,9 +27,29 @@ export const FolderNode = memo(function FolderNode({ data, selected }) {
     }
   };
 
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (data.onNodeContextMenu) {
+      data.onNodeContextMenu(e, data);
+    }
+  };
+
+  const handleMenuClick = (e) => {
+    e.stopPropagation();
+    if (data.onNodeContextMenu) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      data.onNodeContextMenu(
+        { clientX: rect.left, clientY: rect.bottom + 4, preventDefault: () => {} },
+        data
+      );
+    }
+  };
+
   return (
     <div
       onDoubleClick={handleOpenGraph}
+      onContextMenu={handleContextMenu}
       className={`relative min-w-[190px] max-w-[250px] rounded-xl border bg-card p-3 shadow-md transition-all cursor-pointer ${
         isScopeFolder
           ? 'border-amber-500 ring-4 ring-amber-500/40 bg-amber-500/15 shadow-xl shadow-amber-500/10 scale-105 z-20'
@@ -46,7 +66,7 @@ export const FolderNode = memo(function FolderNode({ data, selected }) {
         className="!h-2.5 !w-2.5 !border-2 !border-background !bg-amber-500"
       />
 
-      {/* Top Header: Badge & Status */}
+      {/* Top Header: Badge & Status & 3-dots action menu */}
       <div className="flex items-center justify-between gap-1.5 mb-2">
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
           {isScopeFolder ? (
@@ -77,6 +97,14 @@ export const FolderNode = memo(function FolderNode({ data, selected }) {
               <span>{externalCount}</span>
             </span>
           )}
+          <button
+            type="button"
+            onClick={handleMenuClick}
+            aria-label="Node options"
+            className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors ml-0.5"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 

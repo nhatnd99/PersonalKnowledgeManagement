@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Handle, Position } from 'reactflow';
-import { FileText, Star, Network, ExternalLink } from 'lucide-react';
+import { FileText, Star, Network, ExternalLink, MoreHorizontal } from 'lucide-react';
 
 /**
  * Custom React Flow node representing a knowledge note.
@@ -25,9 +25,29 @@ export const NoteNode = memo(function NoteNode({ data, selected }) {
     }
   };
 
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (data.onNodeContextMenu) {
+      data.onNodeContextMenu(e, data);
+    }
+  };
+
+  const handleMenuClick = (e) => {
+    e.stopPropagation();
+    if (data.onNodeContextMenu) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      data.onNodeContextMenu(
+        { clientX: rect.left, clientY: rect.bottom + 4, preventDefault: () => {} },
+        data
+      );
+    }
+  };
+
   return (
     <div
       onDoubleClick={handleOpenNote}
+      onContextMenu={handleContextMenu}
       className={`relative min-w-[170px] max-w-[230px] rounded-xl border bg-card p-3 shadow-md transition-all cursor-pointer ${
         isExternal
           ? 'border-dashed border-muted-foreground/60 bg-muted/20 opacity-85 hover:opacity-100'
@@ -42,7 +62,7 @@ export const NoteNode = memo(function NoteNode({ data, selected }) {
         className="!h-2.5 !w-2.5 !border-2 !border-background !bg-primary"
       />
 
-      {/* Top Header: Note tag & External indicator */}
+      {/* Top Header: Note tag & External indicator & 3-dots action menu */}
       <div className="flex items-center justify-between gap-1.5 mb-2">
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
           <FileText className="h-3 w-3" />
@@ -67,6 +87,14 @@ export const NoteNode = memo(function NoteNode({ data, selected }) {
               <span>{externalCount}</span>
             </span>
           )}
+          <button
+            type="button"
+            onClick={handleMenuClick}
+            aria-label="Node options"
+            className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors ml-0.5"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 

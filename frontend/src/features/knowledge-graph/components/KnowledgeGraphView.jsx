@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ReactFlow, {
   Background,
@@ -19,8 +19,12 @@ import { FolderNode } from './FolderNode.jsx';
 import { GraphToolbar } from './GraphToolbar.jsx';
 import { GraphNodeDrawer } from './GraphNodeDrawer.jsx';
 import { GraphConnectModal } from './GraphConnectModal.jsx';
+import { GraphContextMenu } from './GraphContextMenu.jsx';
 import { GraphErrorState } from './GraphErrorState.jsx';
 import { GraphEmptyState } from './GraphEmptyState.jsx';
+import { RenameModal } from '../../notes/components/RenameModal.jsx';
+import { MoveToModal } from '../../hierarchy/components/MoveToModal.jsx';
+import { DeleteConfirmModal } from '../../notes/components/DeleteConfirmModal.jsx';
 import { ConnectionsDrawer } from '../../connections/components/ConnectionsDrawer.jsx';
 import { useGraphData } from '../hooks/useGraphData.js';
 import { layoutGraphNodes } from '../utils/graphLayout.js';
@@ -78,6 +82,7 @@ function KnowledgeGraphCanvas() {
   const navigate = useNavigate();
   const { folderId } = useParams();
   const reactFlowInstance = useReactFlow();
+  const containerRef = useRef(null);
 
   // Root Workspace is active for /graph, /graph/root or when no folderId is provided
   const effectiveFolderId = folderId || 'root';
@@ -86,15 +91,64 @@ function KnowledgeGraphCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
+  // Independent edge & node visibility toggles
   const [relationshipType, setRelationshipType] = useState('');
   const [includeHierarchy, setIncludeHierarchy] = useState(true);
+  const [includeKnowledge, setIncludeKnowledge] = useState(true);
+  const [includeExternal, setIncludeExternal] = useState(true);
+
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Selected node (for side inspector drawer)
   const [selectedNode, setSelectedNode] = useState(null);
   const [drawerNode, setDrawerNode] = useState(null);
   const [foldersList, setFoldersList] = useState([]);
 
-  // Connection modal state
+  // Context Menu state
+  const [contextMenu, setContextMenu] = useState({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    targetNode: null,
+  });
+
+  // Modal dialog states
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [connectSourceNode, setConnectSourceNode] = useState(null);
+
+  const [renameTarget, setRenameTarget] = useState(null);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+
+  const [moveTarget, setMoveTarget] = useState(null);
+  const [isMoveOpen, setIsMoveOpen] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  // Drag positions map to persist user manual positioning during session
+  const dragPositionsRef = useRef(new Map());
+
+  // Clear preserved drag positions when changing folder scope
+  useEffect(() => {
+    dragPositionsRef.current.clear();
+  }, [effectiveFolderId]);
+
+  // Fullscreen change listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const handleToggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  }, []);
 
   // Dedicated data fetching hook with race-condition protection
   const {
@@ -108,6 +162,8 @@ function KnowledgeGraphCanvas() {
   } = useGraphData(effectiveFolderId, {
     relationshipType,
     includeHierarchy,
+    includeKnowledge,
+    includeExternal,
   });
 
   // Fetch available folders for dropdown switcher
@@ -128,6 +184,7 @@ function KnowledgeGraphCanvas() {
     (targetFolderId) => {
       setSelectedNode(null);
       setDrawerNode(null);
+      setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, targetNode: null });
       if (targetFolderId === 'root' || !targetFolderId) {
         navigate('/graph/root');
       } else {
@@ -153,13 +210,29 @@ function KnowledgeGraphCanvas() {
     setDrawerNode(node);
   }, []);
 
+  // Context Menu Trigger
+  const handleNodeContextMenu = useCallback((event, nodeData) => {
+    if (event?.preventDefault) event.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      position: { x: event.clientX, y: event.clientY },
+      targetNode: nodeData,
+    });
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, targetNode: null });
+  }, []);
+
+  // Handlers attached to each node data
   const nodeHandlers = useMemo(
     () => ({
       onOpenFolderGraph: handleOpenFolderGraph,
       onOpenNote: handleOpenNote,
       onConnectNode: handleOpenDrawer,
+      onNodeContextMenu: handleNodeContextMenu,
     }),
-    [handleOpenFolderGraph, handleOpenNote, handleOpenDrawer]
+    [handleOpenFolderGraph, handleOpenNote, handleOpenDrawer, handleNodeContextMenu]
   );
 
   // Update React Flow nodes and edges when data changes
@@ -170,7 +243,12 @@ function KnowledgeGraphCanvas() {
       return;
     }
 
-    const formattedNodes = layoutGraphNodes(rawNodes, nodeHandlers, isRootScope);
+    const formattedNodes = layoutGraphNodes(
+      rawNodes,
+      nodeHandlers,
+      isRootScope,
+      dragPositionsRef.current
+    );
     const formattedEdges = formatGraphEdges(rawEdges);
 
     setNodes(formattedNodes);
@@ -195,10 +273,19 @@ function KnowledgeGraphCanvas() {
 
   const onNodeClick = useCallback((_event, node) => {
     setSelectedNode(node.data);
+    setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, targetNode: null });
   }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
+    setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, targetNode: null });
+  }, []);
+
+  const onNodeDragStop = useCallback((_event, node) => {
+    dragPositionsRef.current.set(node.id, {
+      x: node.position.x,
+      y: node.position.y,
+    });
   }, []);
 
   const handleFitView = useCallback(() => {
@@ -207,13 +294,13 @@ function KnowledgeGraphCanvas() {
     }
   }, [reactFlowInstance]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     await Promise.all([reload(), loadFolders()]);
-  };
+  }, [reload, loadFolders]);
 
-  const handleCreateChild = async (type = NOTE_TYPES.NOTE) => {
+  const handleCreateChild = async (type = NOTE_TYPES.NOTE, targetParentId = null) => {
     try {
-      const parentId = isRootScope ? null : effectiveFolderId;
+      const parentId = targetParentId !== null ? targetParentId : (isRootScope ? null : effectiveFolderId);
       const title = type === NOTE_TYPES.FOLDER ? 'New Folder' : 'Untitled Note';
       const res = await noteService.createNote({
         title,
@@ -232,6 +319,36 @@ function KnowledgeGraphCanvas() {
     }
   };
 
+  // Node CRUD Action Triggers
+  const handleTriggerRename = useCallback((node) => {
+    setRenameTarget(node);
+    setIsRenameOpen(true);
+  }, []);
+
+  const handleTriggerMove = useCallback((node) => {
+    setMoveTarget(node);
+    setIsMoveOpen(true);
+  }, []);
+
+  const handleConfirmMove = useCallback(async (noteId, newParentId) => {
+    await noteService.moveNote(noteId, newParentId);
+    await handleRefresh();
+  }, [handleRefresh]);
+
+  const handleTriggerDelete = useCallback((node) => {
+    setDeleteTarget(node);
+    setIsDeleteOpen(true);
+  }, []);
+
+  const handleDeleted = useCallback(async (deletedItem) => {
+    if (deletedItem?.id === effectiveFolderId) {
+      navigate('/graph/root');
+    } else {
+      setSelectedNode(null);
+      await handleRefresh();
+    }
+  }, [effectiveFolderId, navigate, handleRefresh]);
+
   const memoizedNodeTypes = useMemo(() => nodeTypes, []);
 
   // Display user-friendly error state with recovery button if folder not found
@@ -249,7 +366,10 @@ function KnowledgeGraphCanvas() {
   const isEmpty = !isLoading && (isRootScope ? nodes.length === 0 : nodes.length <= 1);
 
   return (
-    <div className="relative h-full w-full bg-background overflow-hidden">
+    <div
+      ref={containerRef}
+      className="relative h-full w-full bg-background overflow-hidden"
+    >
       {/* Top Floating Controls & Breadcrumbs Toolbar */}
       <GraphToolbar
         scope={scopeData}
@@ -259,6 +379,12 @@ function KnowledgeGraphCanvas() {
         onRelationshipTypeChange={setRelationshipType}
         includeHierarchy={includeHierarchy}
         onToggleHierarchy={() => setIncludeHierarchy(!includeHierarchy)}
+        includeKnowledge={includeKnowledge}
+        onToggleKnowledge={() => setIncludeKnowledge(!includeKnowledge)}
+        includeExternal={includeExternal}
+        onToggleExternal={() => setIncludeExternal(!includeExternal)}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={handleToggleFullscreen}
         nodeCount={metadata?.nodeCount ?? nodes.length}
         edgeCount={metadata?.edgeCount ?? edges.length}
         onRefresh={handleRefresh}
@@ -276,6 +402,8 @@ function KnowledgeGraphCanvas() {
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        onNodeContextMenu={(e, node) => handleNodeContextMenu(e, node.data)}
+        onNodeDragStop={onNodeDragStop}
         fitView
         className="bg-muted/10"
       >
@@ -305,6 +433,26 @@ function KnowledgeGraphCanvas() {
         onOpenNote={handleOpenNote}
         onOpenFolderGraph={handleOpenFolderGraph}
         onConnectNode={(node) => setDrawerNode(node)}
+        onRename={handleTriggerRename}
+        onMoveTo={handleTriggerMove}
+        onDelete={handleTriggerDelete}
+      />
+
+      {/* Floating Context Menu */}
+      <GraphContextMenu
+        isOpen={contextMenu.isOpen}
+        position={contextMenu.position}
+        targetNode={contextMenu.targetNode}
+        onClose={handleCloseContextMenu}
+        onOpenNote={handleOpenNote}
+        onOpenFolderGraph={handleOpenFolderGraph}
+        onRename={handleTriggerRename}
+        onCreateChildNote={(parentId) => handleCreateChild(NOTE_TYPES.NOTE, parentId)}
+        onCreateSubfolder={(parentId) => handleCreateChild(NOTE_TYPES.FOLDER, parentId)}
+        onMoveTo={handleTriggerMove}
+        onConnect={(node) => handleOpenConnectModal(node)}
+        onViewConnections={(node) => handleOpenDrawer(node)}
+        onDelete={handleTriggerDelete}
       />
 
       {/* Connect Modal */}
@@ -314,6 +462,31 @@ function KnowledgeGraphCanvas() {
         sourceNode={connectSourceNode}
         availableNodes={rawNodes}
         onSuccess={handleRefresh}
+      />
+
+      {/* Rename Modal */}
+      <RenameModal
+        isOpen={isRenameOpen}
+        onClose={() => setIsRenameOpen(false)}
+        target={renameTarget}
+        onRenamed={handleRefresh}
+      />
+
+      {/* Move To Modal */}
+      <MoveToModal
+        isOpen={isMoveOpen}
+        onClose={() => setIsMoveOpen(false)}
+        targetNode={moveTarget}
+        onMove={handleConfirmMove}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        noteId={deleteTarget?.id}
+        initialTarget={deleteTarget}
+        onDeleted={handleDeleted}
       />
 
       {/* Full Connections Drawer (Hierarchy + Semantic) */}

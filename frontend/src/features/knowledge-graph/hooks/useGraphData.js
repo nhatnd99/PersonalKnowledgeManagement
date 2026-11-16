@@ -9,10 +9,17 @@ import { graphService } from '../services/graphService.js';
  * @param {Object} options - Query options
  * @param {string} [options.relationshipType] - Filter by relationship type
  * @param {boolean} [options.includeHierarchy=true] - Include hierarchy edges
+ * @param {boolean} [options.includeKnowledge=true] - Include semantic knowledge edges
+ * @param {boolean} [options.includeExternal=true] - Include external connected nodes
  * @returns {Object} Graph state and reload helper
  */
 export function useGraphData(folderId, options = {}) {
-  const { relationshipType, includeHierarchy = true } = options;
+  const {
+    relationshipType,
+    includeHierarchy = true,
+    includeKnowledge = true,
+    includeExternal = true,
+  } = options;
 
   const [scopeData, setScopeData] = useState(null);
   const [rawNodes, setRawNodes] = useState([]);
@@ -33,6 +40,8 @@ export function useGraphData(folderId, options = {}) {
       const data = await graphService.getFolderGraph(folderId, {
         relationshipType: relationshipType || undefined,
         includeHierarchy,
+        includeKnowledge,
+        includeExternal,
       });
 
       // Ignore if a newer fetch request was initiated
@@ -57,7 +66,7 @@ export function useGraphData(folderId, options = {}) {
         setIsLoading(false);
       }
     }
-  }, [folderId, relationshipType, includeHierarchy]);
+  }, [folderId, relationshipType, includeHierarchy, includeKnowledge, includeExternal]);
 
   useEffect(() => {
     fetchGraph();

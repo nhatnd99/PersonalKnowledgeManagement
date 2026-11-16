@@ -13,6 +13,7 @@ import {
   FilePlus,
   Network,
   FolderInput,
+  Edit2,
 } from 'lucide-react';
 import { NOTE_TYPES } from '../../../constants/index.js';
 
@@ -28,6 +29,7 @@ export function TreeNode({
   onCreateChild,
   onDeleteNote,
   onOpenMoveModal,
+  onOpenRenameModal,
 }) {
   const navigate = useNavigate();
   const isExpanded = expandedNodeIds.has(node.id);
@@ -151,6 +153,19 @@ export function TreeNode({
                   Open Graph
                 </button>
               )}
+              {onOpenRenameModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+                    onOpenRenameModal(node);
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 hover:bg-muted text-foreground"
+                >
+                  <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  Rename
+                </button>
+              )}
               {onOpenMoveModal && (
                 <button
                   type="button"
@@ -218,6 +233,7 @@ export function TreeNode({
               onCreateChild={onCreateChild}
               onDeleteNote={onDeleteNote}
               onOpenMoveModal={onOpenMoveModal}
+              onOpenRenameModal={onOpenRenameModal}
             />
           ))}
         </div>

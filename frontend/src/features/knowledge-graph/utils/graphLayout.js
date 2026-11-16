@@ -3,8 +3,8 @@
  * Computes deterministic, collision-safe 2D positions for nodes in React Flow canvas.
  */
 
-const DEFAULT_CENTER_X = 450;
-const DEFAULT_CENTER_Y = 320;
+const DEFAULT_CENTER_X = 500;
+const DEFAULT_CENTER_Y = 350;
 
 /**
  * Calculates layout positions for scoped graph nodes.
@@ -12,9 +12,15 @@ const DEFAULT_CENTER_Y = 320;
  * @param {Array} rawNodes - Raw node objects from backend API
  * @param {Object} handlers - Event handlers to attach to node data
  * @param {boolean} [isRootScope=false] - Whether rendering root workspace
+ * @param {Map<string, {x: number, y: number}>} [existingPositions=new Map()] - Preserved positions from manual drags
  * @returns {Array} Formatted React Flow nodes with type, position, and data
  */
-export function layoutGraphNodes(rawNodes = [], handlers = {}, isRootScope = false) {
+export function layoutGraphNodes(
+  rawNodes = [],
+  handlers = {},
+  isRootScope = false,
+  existingPositions = new Map()
+) {
   const count = rawNodes.length;
   if (count === 0) return [];
 
@@ -25,10 +31,15 @@ export function layoutGraphNodes(rawNodes = [], handlers = {}, isRootScope = fal
 
   if (scopeFolderNode && !isRootScope) {
     // 1. Folder Graph: Place Central Scope Folder at center
+    const centralPos = existingPositions.get(scopeFolderNode.id) || {
+      x: DEFAULT_CENTER_X,
+      y: DEFAULT_CENTER_Y,
+    };
+
     formattedNodes.push({
       id: scopeFolderNode.id,
       type: 'folderNode',
-      position: { x: DEFAULT_CENTER_X, y: DEFAULT_CENTER_Y },
+      position: centralPos,
       data: {
         ...scopeFolderNode,
         isCentralNode: true,
@@ -42,18 +53,25 @@ export function layoutGraphNodes(rawNodes = [], handlers = {}, isRootScope = fal
 
     // Arrange direct children in primary orbit
     const childCount = internalChildren.length;
-    const baseRadius = Math.max(220, childCount * 50);
+    // Nodes are ~220px wide and 100px tall; give ample circumference
+    const baseRadius = Math.max(260, (childCount * 280) / (2 * Math.PI));
 
     internalChildren.forEach((node, index) => {
-      // Offset initial angle slightly so top and bottom handles line up nicely
-      const angle = (index / Math.max(1, childCount)) * 2 * Math.PI - Math.PI / 2;
-      const x = DEFAULT_CENTER_X + baseRadius * 1.2 * Math.cos(angle);
-      const y = DEFAULT_CENTER_Y + baseRadius * 0.9 * Math.sin(angle);
+      const savedPos = existingPositions.get(node.id);
+      let position = savedPos;
+
+      if (!position) {
+        // Offset initial angle slightly so top and bottom handles line up nicely
+        const angle = (index / Math.max(1, childCount)) * 2 * Math.PI - Math.PI / 2;
+        const x = DEFAULT_CENTER_X + baseRadius * 1.35 * Math.cos(angle);
+        const y = DEFAULT_CENTER_Y + baseRadius * 1.05 * Math.sin(angle);
+        position = { x, y };
+      }
 
       formattedNodes.push({
         id: node.id,
         type: node.type === 'FOLDER' ? 'folderNode' : 'noteNode',
-        position: { x, y },
+        position,
         data: {
           ...node,
           ...handlers,
@@ -63,17 +81,23 @@ export function layoutGraphNodes(rawNodes = [], handlers = {}, isRootScope = fal
 
     // Arrange external nodes in outer orbit
     const extCount = externalNodes.length;
-    const extRadius = baseRadius + 160;
+    const extRadius = baseRadius + 220;
 
     externalNodes.forEach((node, index) => {
-      const angle = (index / Math.max(1, extCount)) * 2 * Math.PI;
-      const x = DEFAULT_CENTER_X + extRadius * 1.25 * Math.cos(angle);
-      const y = DEFAULT_CENTER_Y + extRadius * 0.95 * Math.sin(angle);
+      const savedPos = existingPositions.get(node.id);
+      let position = savedPos;
+
+      if (!position) {
+        const angle = (index / Math.max(1, extCount)) * 2 * Math.PI;
+        const x = DEFAULT_CENTER_X + extRadius * 1.4 * Math.cos(angle);
+        const y = DEFAULT_CENTER_Y + extRadius * 1.1 * Math.sin(angle);
+        position = { x, y };
+      }
 
       formattedNodes.push({
         id: node.id,
         type: node.type === 'FOLDER' ? 'folderNode' : 'noteNode',
-        position: { x, y },
+        position,
         data: {
           ...node,
           ...handlers,
@@ -82,18 +106,24 @@ export function layoutGraphNodes(rawNodes = [], handlers = {}, isRootScope = fal
     });
   } else {
     // 2. Root Workspace Graph (or workspace with no single central folder)
-    if (count <= 10) {
+    if (count <= 8) {
       // Single ring orbit around workspace center
-      const radius = Math.max(240, count * 55);
+      const radius = Math.max(260, (count * 280) / (2 * Math.PI));
       rawNodes.forEach((node, index) => {
-        const angle = (index / Math.max(1, count)) * 2 * Math.PI - Math.PI / 2;
-        const x = DEFAULT_CENTER_X + radius * 1.2 * Math.cos(angle);
-        const y = DEFAULT_CENTER_Y + radius * 0.9 * Math.sin(angle);
+        const savedPos = existingPositions.get(node.id);
+        let position = savedPos;
+
+        if (!position) {
+          const angle = (index / Math.max(1, count)) * 2 * Math.PI - Math.PI / 2;
+          const x = DEFAULT_CENTER_X + radius * 1.35 * Math.cos(angle);
+          const y = DEFAULT_CENTER_Y + radius * 1.05 * Math.sin(angle);
+          position = { x, y };
+        }
 
         formattedNodes.push({
           id: node.id,
           type: node.type === 'FOLDER' ? 'folderNode' : 'noteNode',
-          position: { x, y },
+          position,
           data: {
             ...node,
             ...handlers,
@@ -103,21 +133,27 @@ export function layoutGraphNodes(rawNodes = [], handlers = {}, isRootScope = fal
     } else {
       // Clean 4-column responsive grid layout
       const cols = 4;
-      const colWidth = 260;
-      const rowHeight = 160;
+      const colWidth = 280;
+      const rowHeight = 180;
       const startX = 120;
-      const startY = 100;
+      const startY = 120;
 
       rawNodes.forEach((node, index) => {
-        const col = index % cols;
-        const row = Math.floor(index / cols);
-        const x = startX + col * colWidth;
-        const y = startY + row * rowHeight;
+        const savedPos = existingPositions.get(node.id);
+        let position = savedPos;
+
+        if (!position) {
+          const col = index % cols;
+          const row = Math.floor(index / cols);
+          const x = startX + col * colWidth;
+          const y = startY + row * rowHeight;
+          position = { x, y };
+        }
 
         formattedNodes.push({
           id: node.id,
           type: node.type === 'FOLDER' ? 'folderNode' : 'noteNode',
-          position: { x, y },
+          position,
           data: {
             ...node,
             ...handlers,
