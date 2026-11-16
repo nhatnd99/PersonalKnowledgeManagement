@@ -7,13 +7,10 @@ import axios from 'axios';
  * Do not create separate axios instances in feature modules.
  *
  * Configuration:
- * - Base URL is loaded from VITE_API_BASE_URL environment variable
+ * - Base URL is loaded from VITE_API_BASE_URL environment variable (defaults to /api/v1)
  * - Default timeout: 15 seconds
+ * - withCredentials: true ensures HttpOnly session cookies are transmitted automatically
  * - Default Content-Type: application/json
- *
- * Interceptors:
- * - Request interceptor: attach auth token when available (future)
- * - Response interceptor: normalize error responses
  */
 const rawBaseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
 const baseURL = rawBaseURL.replace(/\/+$/, '');
@@ -21,6 +18,7 @@ const baseURL = rawBaseURL.replace(/\/+$/, '');
 const apiClient = axios.create({
   baseURL,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,9 +28,6 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    // Future: attach authentication token
-    // const token = getAuthToken();
-    // if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => {
@@ -44,11 +39,10 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => {
-    // Return the data directly for convenience
     return response;
   },
   (error) => {
-    // Normalize error structure for consistent handling in features
+    // Normalize error structure for consistent handling across frontend features
     const normalizedError = {
       message: error.response?.data?.message || error.message || 'An unexpected error occurred',
       status: error.response?.status,

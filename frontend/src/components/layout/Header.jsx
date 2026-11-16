@@ -1,12 +1,15 @@
 import PropTypes from 'prop-types';
-import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, Network, Search, Tag, Settings, FolderTree } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { BookOpen, Network, Search, Tag, Settings, FolderTree, LogOut } from 'lucide-react';
+import { useAuth } from '../../features/auth/hooks/useAuth.js';
 
 /**
  * Application header with responsive navigation, folder drawer toggle, and quick actions.
  */
 export function Header({ onToggleMobileDrawer }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const navLinks = [
     { to: '/notes', label: 'Notes', icon: BookOpen },
@@ -14,6 +17,11 @@ export function Header({ onToggleMobileDrawer }) {
     { to: '/search', label: 'Search', icon: Search },
     { to: '/tags', label: 'Tags', icon: Tag },
   ];
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-3 sm:px-4 lg:px-6 shrink-0">
@@ -64,16 +72,41 @@ export function Header({ onToggleMobileDrawer }) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <span className="hidden sm:inline-block text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded">
-          v0.1.0 • PostgreSQL
-        </span>
-        <button
-          type="button"
-          aria-label="Settings"
+        {user && (
+          <Link
+            to="/settings"
+            className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-muted transition text-xs text-foreground"
+            title="Account Settings"
+          >
+            <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+              {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <span className="hidden sm:inline-block font-medium truncate max-w-[120px]">
+              {user.displayName || user.email}
+            </span>
+          </Link>
+        )}
+
+        <Link
+          to="/settings"
+          aria-label="Account Settings"
+          title="Account Settings"
           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <Settings className="h-4 w-4" />
-        </button>
+        </Link>
+
+        {user && (
+          <button
+            type="button"
+            onClick={handleLogout}
+            aria-label="Log Out"
+            title="Log Out"
+            className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </header>
   );
